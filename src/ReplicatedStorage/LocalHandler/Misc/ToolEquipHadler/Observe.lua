@@ -26,6 +26,8 @@ function ToolEquipObserve.new()
 
 	self._onEquipped = nil
 	self._onUnequipped = nil
+	self._onActivated = nil
+	self._onToolChanged = nil
 	self._onCharacter = nil
 
 	return self
@@ -51,6 +53,8 @@ function ToolEquipObserve:Stop()
 
 	self._onEquipped = nil
 	self._onUnequipped = nil
+	self._onActivated = nil
+	self._onToolChanged = nil
 	self._onCharacter = nil
 end
 
@@ -75,6 +79,12 @@ function ToolEquipObserve:_unbindTool(tool: Tool)
 		disconnect(c)
 	end
 	self._toolConns[tool] = nil
+end
+
+function ToolEquipObserve:_notifyToolChanged(tool: Tool)
+	if self._onToolChanged then
+		self._onToolChanged(tool)
+	end
 end
 
 function ToolEquipObserve:_bindTool(tool: Tool)
@@ -104,10 +114,46 @@ function ToolEquipObserve:_bindTool(tool: Tool)
 
 	table.insert(
 		conns,
+		tool.Activated:Connect(function()
+			if self._onActivated then
+				self._onActivated(tool)
+			end
+		end)
+	)
+
+	table.insert(
+		conns,
+		tool.ChildAdded:Connect(function(child)
+			if child.Name == "EquipedWeapon" then
+				self:_notifyToolChanged(tool)
+			end
+		end)
+	)
+
+	table.insert(
+		conns,
+		tool.ChildRemoved:Connect(function(child)
+			if child.Name == "EquipedWeapon" then
+				self:_notifyToolChanged(tool)
+			end
+		end)
+	)
+
+	table.insert(
+		conns,
+		tool:GetAttributeChangedSignal("Type"):Connect(function()
+			self:_notifyToolChanged(tool)
+		end)
+	)
+
+	table.insert(
+		conns,
 		tool.AncestryChanged:Connect(function()
 			if not self:_isOwnedTool(tool) then
 				self:_unbindTool(tool)
+				return
 			end
+			self:_notifyToolChanged(tool)
 		end)
 	)
 
@@ -129,6 +175,7 @@ function ToolEquipObserve:_bindBackpack(backpack: Backpack)
 	self._backpackConn = backpack.ChildAdded:Connect(function(child)
 		if isTool(child) then
 			self:_bindTool(child)
+			self:_notifyToolChanged(child)
 		end
 	end)
 end
@@ -140,6 +187,7 @@ function ToolEquipObserve:_bindCharacter(char: Model)
 	self._characterConn = char.ChildAdded:Connect(function(child)
 		if isTool(child) then
 			self:_bindTool(child)
+			self:_notifyToolChanged(child)
 		end
 	end)
 
@@ -158,6 +206,8 @@ function ToolEquipObserve:Start(callbacks)
 
 	self._onEquipped = callbacks.onEquipped
 	self._onUnequipped = callbacks.onUnequipped
+	self._onActivated = callbacks.onActivated
+	self._onToolChanged = callbacks.onToolChanged
 	self._onCharacter = callbacks.onCharacter
 
 	local backpack = LOCAL_PLAYER:FindFirstChild("Backpack")

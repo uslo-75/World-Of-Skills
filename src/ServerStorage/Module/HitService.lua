@@ -32,6 +32,75 @@ local Combat = getCombatApi()
 local DEFAULT_WALKSPEED = 9
 local DEFAULT_JUMPPOWER = 6.2
 
+local ATTR_HYPERARMOR_TYPE = "HyperArmorType"
+local ATTR_HYPERARMOR_EXPIRES_AT = "HyperArmorExpiresAt"
+local ATTR_HYPERARMOR_DAMAGE_MULT = "HyperArmorDamageMultiplier"
+local ATTR_HYPERARMOR_NO_RAGDOLL = "HyperArmorNoRagdoll"
+
+local function clearHyperArmor(enemyChar)
+	enemyChar:SetAttribute(ATTR_HYPERARMOR_TYPE, nil)
+	enemyChar:SetAttribute(ATTR_HYPERARMOR_EXPIRES_AT, nil)
+	enemyChar:SetAttribute(ATTR_HYPERARMOR_DAMAGE_MULT, nil)
+	enemyChar:SetAttribute(ATTR_HYPERARMOR_NO_RAGDOLL, nil)
+	enemyChar:SetAttribute("HyperArmorSource", nil)
+end
+
+local function getActiveHyperArmor(enemyChar)
+	if not enemyChar or not enemyChar.Parent then
+		return nil
+	end
+
+	local armorType = enemyChar:GetAttribute(ATTR_HYPERARMOR_TYPE)
+	if typeof(armorType) ~= "string" or armorType == "" then
+		return nil
+	end
+
+	local expiresAt = tonumber(enemyChar:GetAttribute(ATTR_HYPERARMOR_EXPIRES_AT)) or 0
+	if expiresAt > 0 and os.clock() >= expiresAt then
+		clearHyperArmor(enemyChar)
+		return nil
+	end
+
+	return {
+		type = armorType,
+		damageMultiplier = math.clamp(tonumber(enemyChar:GetAttribute(ATTR_HYPERARMOR_DAMAGE_MULT)) or 1, 0, 1),
+		noRagdoll = enemyChar:GetAttribute(ATTR_HYPERARMOR_NO_RAGDOLL) == true,
+	}
+end
+
+local function resolveDamageWithHyperArmor(enemyChar, damage, ragdoll, ragdollDuration, bypassHyperArmor)
+	local adjustedDamage = tonumber(damage) or 0
+	local adjustedRagdoll = ragdoll == true
+	local adjustedRagdollDuration = ragdollDuration or 0
+
+	if bypassHyperArmor then
+		return adjustedDamage, adjustedRagdoll, adjustedRagdollDuration, false
+	end
+
+	-- Keep non-damage system stuns (parry/guardbreak flow) unaffected.
+	if adjustedDamage <= 0 and not adjustedRagdoll then
+		return adjustedDamage, adjustedRagdoll, adjustedRagdollDuration, false
+	end
+
+	local armorState = getActiveHyperArmor(enemyChar)
+	if not armorState then
+		return adjustedDamage, adjustedRagdoll, adjustedRagdollDuration, false
+	end
+
+	local armorType = string.lower(armorState.type)
+	if armorType == "invulnerable" then
+		return 0, false, 0, true
+	end
+
+	adjustedDamage = adjustedDamage * armorState.damageMultiplier
+	if armorState.noRagdoll then
+		adjustedRagdoll = false
+		adjustedRagdollDuration = 0
+	end
+
+	return adjustedDamage, adjustedRagdoll, adjustedRagdollDuration, false
+end
+
 local function tryForceStopCarryGrip(enemyChar)
 	if not Combat then
 		return
@@ -144,13 +213,18 @@ local function applyBurn(enemyHumanoid)
 	end)
 end
 
-function HitService.Hit(enemyHumanoid, damage, stunDuration, knockback, ragdoll, ragdollDuration, elementalEffect)
+function HitService.Hit(enemyHumanoid, damage, stunDuration, knockback, ragdoll, ragdollDuration, elementalEffect, bypassHyperArmor)
 	if not enemyHumanoid or not enemyHumanoid.Parent then
 		return
 	end
 
 	local enemyChar = enemyHumanoid.Parent
 	local enemyRoot = enemyChar:FindFirstChild("HumanoidRootPart")
+	local resolvedDamage, resolvedRagdoll, resolvedRagdollDuration, blockedByInvulnerable =
+		resolveDamageWithHyperArmor(enemyChar, damage, ragdoll, ragdollDuration, bypassHyperArmor)
+	if blockedByInvulnerable then
+		return
+	end
 
 	if not Combat then
 		Combat = getCombatApi()
@@ -158,15 +232,15 @@ function HitService.Hit(enemyHumanoid, damage, stunDuration, knockback, ragdoll,
 
 	tryForceStopCarryGrip(enemyChar)
 
-	if damage and damage ~= 0 then
-		RegenManager:ApplyDamage(enemyHumanoid, damage)
+	if resolvedDamage and resolvedDamage ~= 0 then
+		RegenManager:ApplyDamage(enemyHumanoid, resolvedDamage)
 		if enemyRoot then
 			enemyRoot.Anchored = false
 		end
 	end
 
-	if ragdoll then
-		applyRagdoll(enemyHumanoid, ragdollDuration or 0)
+	if resolvedRagdoll then
+		applyRagdoll(enemyHumanoid, resolvedRagdollDuration or 0)
 	end
 
 	if stunDuration and stunDuration > 0 then

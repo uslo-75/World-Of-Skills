@@ -13,6 +13,14 @@ function ActionsVault.Bind(module, context)
 	local vaultParams = context.vaultParams
 	local sounds = context.sounds
 
+	local function isDefenseActive(plr: Player, char: Model): boolean
+		if char:GetAttribute("isBlocking") == true or char:GetAttribute("Parrying") == true then
+			return true
+		end
+
+		return StateManager.GetState(plr, "isBlocking") == true or StateManager.GetState(plr, "Parrying") == true
+	end
+
 	function module.Vault(plr: Player)
 		if not plr or not canUseVault(plr) then
 			return
@@ -23,6 +31,9 @@ function ActionsVault.Bind(module, context)
 
 		local char = plr.Character
 		if not char then
+			return
+		end
+		if isDefenseActive(plr, char) then
 			return
 		end
 
@@ -48,6 +59,8 @@ function ActionsVault.Bind(module, context)
 				"WallRunning",
 				"WallHopping",
 				"Dashing",
+				"isBlocking",
+				"Parrying",
 			})
 		then
 			return
@@ -116,6 +129,9 @@ function ActionsVault.Bind(module, context)
 		if not char then
 			return
 		end
+		if isDefenseActive(plr, char) then
+			return
+		end
 		if isGripBlocked(plr) then
 			return
 		end
@@ -148,6 +164,8 @@ function ActionsVault.Bind(module, context)
 				"WallRunning",
 				"WallHopping",
 				"Dashing",
+				"isBlocking",
+				"Parrying",
 			})
 		then
 			return

@@ -41,11 +41,18 @@ function GeoResolver.tryResolve(state, geoConfig)
 	end
 
 	local payload = payloadOrErr
-	if payload.status ~= "success" then
+	local status = payload.status
+	if status ~= nil and string.lower(tostring(status)) ~= "success" then
+		return false
+	end
+
+	local success = payload.success
+	if success ~= nil and success ~= true then
 		return false
 	end
 
 	local resolvedRegion = Utils.trimString(payload.regionName)
+		or Utils.trimString(payload.region_name)
 		or Utils.trimString(payload.region)
 		or Utils.trimString(payload.city)
 

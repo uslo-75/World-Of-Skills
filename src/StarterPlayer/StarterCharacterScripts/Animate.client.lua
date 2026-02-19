@@ -30,6 +30,11 @@ local DEBUG_BASE_ANIM = false
 
 local BASE_TYPE = "Base"
 local BLOCK_STATES = MovementBlockStates.BaseAnimator
+local PASS_THROUGH_BASE_STATES = {
+	Swinging = true,
+	isBlocking = true,
+	Parrying = true,
+}
 
 local currentConn: RBXScriptConnection? = nil
 local currentDiedConn: RBXScriptConnection? = nil
@@ -50,6 +55,20 @@ local FALL_DELAY = 0.25
 local FALL_DELAY_WHILE_RUNNING = 0.8
 local FALL_MIN_DOWN_VY = -1
 local STOP_FADE = 0.12
+local BASE_PRIORITIES = {
+	idle = Enum.AnimationPriority.Core,
+	walk = Enum.AnimationPriority.Movement,
+	run = Enum.AnimationPriority.Movement,
+	jump = Enum.AnimationPriority.Movement,
+	fall = Enum.AnimationPriority.Movement,
+}
+
+local function getBasePriority(desired: string?): Enum.AnimationPriority
+	if desired and BASE_PRIORITIES[desired] then
+		return BASE_PRIORITIES[desired]
+	end
+	return Enum.AnimationPriority.Movement
+end
 
 local function findAnimationByNames(folder: Instance?, names: { string }): Animation?
 	if not folder then
@@ -79,7 +98,7 @@ end
 
 local function isBlocked(plr: Player): boolean
 	for _, stateName in ipairs(BLOCK_STATES) do
-		if StateManager.GetState(plr, stateName) == true then
+		if not PASS_THROUGH_BASE_STATES[stateName] and StateManager.GetState(plr, stateName) == true then
 			return true
 		end
 	end
@@ -125,6 +144,12 @@ local function getEquippedToolName(char: Model): string?
 	if not tool then
 		return nil
 	end
+	if tool:GetAttribute("Type") ~= "Attack" then
+		return nil
+	end
+	if not tool:FindFirstChild("EquipedWeapon") then
+		return nil
+	end
 
 	local weaponAttr = tool:GetAttribute("Weapon")
 	if typeof(weaponAttr) == "string" and weaponAttr ~= "" then
@@ -139,11 +164,19 @@ local function resolveAnimId(desired: string, toolName: string?, animate: Instan
 		local animRoot = assetsRoot:FindFirstChild("animation")
 		if animRoot then
 			-- weapon-specific (combat)
-			if toolName then
+			-- Keep base walk/idle generic so weapon idle overlay can layer consistently.
+			if toolName and desired ~= "walk" and desired ~= "idle" then
 				local combat = animRoot:FindFirstChild("combat")
 				local toolFolder = combat and combat:FindFirstChild(toolName)
-				local desiredUpper = desired:sub(1, 1):upper() .. desired:sub(2)
-				local animObj = findAnimationByNames(toolFolder, { desired, desiredUpper })
+				local desiredNames = { desired, desired:sub(1, 1):upper() .. desired:sub(2) }
+				if desired == "run" then
+					desiredNames = { "NormalRun", "Run", "run" }
+				elseif desired == "walk" then
+					desiredNames = { "Walk", "walk" }
+				elseif desired == "idle" then
+					desiredNames = { "Idle", "idle" }
+				end
+				local animObj = findAnimationByNames(toolFolder, desiredNames)
 				if animObj then
 					return animObj.AnimationId
 				end
@@ -419,6 +452,7 @@ local function setupBaseAnimations(character: Model)
 		local toolName = getEquippedToolName(character)
 		local key = desired .. "|" .. tostring(toolName or "none")
 		local resolvedAnimId = resolveAnimId(desired, toolName, animate, assetsRoot)
+		local desiredPriority = getBasePriority(desired)
 
 		local transitionedToIdleWalk = (desired == "idle" or desired == "walk") and desired ~= lastDesired
 		if transitionedToIdleWalk then
@@ -446,6 +480,9 @@ local function setupBaseAnimations(character: Model)
 			if canKeepCurrent then
 				currentKey = key
 				currentBaseName = desired
+				if currentTrack then
+					currentTrack.Priority = desiredPriority
+				end
 
 				if getTrackIsPlaying(currentTrack) == false then
 					pcall(function()
@@ -464,7 +501,7 @@ local function setupBaseAnimations(character: Model)
 					currentAnimId = resolvedAnimId
 					currentTrack = AnimationHandler.LoadAnim(character, BASE_TYPE, resolvedAnimId, nil, {
 						replaceType = true,
-						priority = Enum.AnimationPriority.Core,
+						priority = desiredPriority,
 					})
 					if currentTrack then
 						currentTrack.Name = desired

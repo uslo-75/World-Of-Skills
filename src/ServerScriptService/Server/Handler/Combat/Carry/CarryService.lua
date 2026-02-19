@@ -5,6 +5,8 @@ local CollectionService = game:GetService("CollectionService")
 local CarryService = {}
 CarryService.__index = CarryService
 
+local DEFAULT_VISUAL_RADIUS = 180
+
 local function setRagdoll(stateManager, targetCharacter, targetPlayer, enabled)
 	if targetCharacter and targetCharacter.Parent then
 		targetCharacter:SetAttribute("IsRagdoll", enabled)
@@ -104,6 +106,7 @@ function CarryService.new(deps)
 	self.TargetLock = deps.TargetLock
 	self.Maid = deps.Maid
 	self.AssetsRoot = deps.AssetsRoot or RS
+	self.CombatReplication = deps.CombatReplication
 
 	self._active = {} -- [player] = { cancel=fn, carrierRoot=..., targetRoot=..., carriedAnimId=... }
 	self._syncing = {} -- [player] = true
@@ -115,19 +118,58 @@ function CarryService:_carryAnim(name)
 	return self.AnimUtil.FindCombatAnimation(self.AssetsRoot, self.Config.AnimFolder, name)
 end
 
+function CarryService:_resolveVisualRecipients(carrierRoot: BasePart?, targetRoot: BasePart?): ({ Model }, { Player })
+	local contextCharacters = {}
+	local includePlayers = {}
+
+	local function appendCharacterFromRoot(root: BasePart?)
+		local parent = root and root.Parent
+		if parent and parent:IsA("Model") then
+			table.insert(contextCharacters, parent)
+			local player = Players:GetPlayerFromCharacter(parent)
+			if player then
+				table.insert(includePlayers, player)
+			end
+		end
+	end
+
+	appendCharacterFromRoot(carrierRoot)
+	appendCharacterFromRoot(targetRoot)
+
+	return contextCharacters, includePlayers
+end
+
+function CarryService:_sendVisual(actionName: string, args: { any }, contextCharacters: { Model }, includePlayers: { Player })
+	if self.CombatReplication and typeof(self.CombatReplication.FireClientsNearArgs) == "function" then
+		local radius = math.max(0, tonumber(self.Config.VisualReplicationRadius) or DEFAULT_VISUAL_RADIUS)
+		self.CombatReplication.FireClientsNearArgs(
+			self.Replication,
+			"CarryVisual",
+			actionName,
+			args,
+			contextCharacters,
+			radius,
+			includePlayers
+		)
+		return
+	end
+
+	self.Replication:FireAllClients("CarryVisual", actionName, table.unpack(args))
+end
+
 function CarryService:_sendVisualStart(carrierRoot, targetRoot, carriedAnimId)
-	self.Replication:FireAllClients(
-		"CarryVisual",
+	local contextCharacters, includePlayers = self:_resolveVisualRecipients(carrierRoot, targetRoot)
+	self:_sendVisual(
 		"Start",
-		carrierRoot,
-		targetRoot,
-		self.Config.CarryOffset,
-		carriedAnimId
+		{ carrierRoot, targetRoot, self.Config.CarryOffset, carriedAnimId },
+		contextCharacters,
+		includePlayers
 	)
 end
 
-function CarryService:_sendVisualStop(targetRoot)
-	self.Replication:FireAllClients("CarryVisual", "Stop", targetRoot)
+function CarryService:_sendVisualStop(targetRoot, carrierRoot)
+	local contextCharacters, includePlayers = self:_resolveVisualRecipients(carrierRoot, targetRoot)
+	self:_sendVisual("Stop", { targetRoot }, contextCharacters, includePlayers)
 end
 
 function CarryService:_waitReady(player)
@@ -310,6 +352,14 @@ function CarryService:_start(player, prompt)
 	local carriedTrack = self.AnimUtil.LoadTrack(targetHum, carriedAnim, "Carried")
 	local carriedAnimId = carriedAnim and carriedAnim.AnimationId or nil
 
+	-- Carry should stay above weapon idle overlays and base locomotion.
+	if carryTrack then
+		carryTrack.Priority = Enum.AnimationPriority.Action2
+	end
+	if carriedTrack then
+		carriedTrack.Priority = Enum.AnimationPriority.Action2
+	end
+
 	maid:Give(function()
 		if carryTrack and carryTrack.IsPlaying then
 			pcall(function()
@@ -342,7 +392,7 @@ function CarryService:_start(player, prompt)
 			self.Collision.SetGroup(targetChar, prevGroup)
 		end
 
-		self:_sendVisualStop(targetRoot)
+		self:_sendVisualStop(targetRoot, carrierRoot)
 	end)
 
 	local attachCarrier = Instance.new("Attachment")

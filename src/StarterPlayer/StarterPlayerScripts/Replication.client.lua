@@ -18,15 +18,80 @@ end)
 local LocalHandler = game.ReplicatedStorage:WaitForChild("LocalHandler")
 local moduleScriptCache: { [string]: ModuleScript } = {}
 local requiredModuleCache: { [string]: any } = {}
+local ambiguousModuleNames: { [string]: boolean } = {}
+local cacheBuilt = false
 
-local function findModuleDeep(root: Instance, moduleName: string): ModuleScript?
-	for _, inst in ipairs(root:GetDescendants()) do
-		if inst:IsA("ModuleScript") and inst.Name == moduleName then
-			return inst
+local function rebuildModuleIndex()
+	table.clear(moduleScriptCache)
+	table.clear(ambiguousModuleNames)
+
+	for _, inst in ipairs(LocalHandler:GetDescendants()) do
+		if not inst:IsA("ModuleScript") then
+			continue
 		end
+
+		local moduleName = inst.Name
+		if ambiguousModuleNames[moduleName] then
+			continue
+		end
+
+		local existing = moduleScriptCache[moduleName]
+		if existing and existing ~= inst then
+			moduleScriptCache[moduleName] = nil
+			ambiguousModuleNames[moduleName] = true
+			continue
+		end
+
+		moduleScriptCache[moduleName] = inst
 	end
-	return nil
+
+	cacheBuilt = true
 end
+
+local function getIndexedModule(moduleName: string): (ModuleScript?, string?)
+	if not cacheBuilt then
+		rebuildModuleIndex()
+	end
+
+	if ambiguousModuleNames[moduleName] then
+		return nil, ("[Replication] ModuleScript '%s' is ambiguous in LocalHandler (duplicate names)"):format(moduleName)
+	end
+
+	local moduleScript = moduleScriptCache[moduleName]
+	if moduleScript and moduleScript.Parent then
+		return moduleScript, nil
+	end
+
+	rebuildModuleIndex()
+	if ambiguousModuleNames[moduleName] then
+		return nil, ("[Replication] ModuleScript '%s' is ambiguous in LocalHandler (duplicate names)"):format(moduleName)
+	end
+
+	moduleScript = moduleScriptCache[moduleName]
+	if not moduleScript then
+		return nil, ("[Replication] ModuleScript '%s' not found under LocalHandler index"):format(moduleName)
+	end
+
+	return moduleScript, nil
+end
+
+LocalHandler.DescendantAdded:Connect(function(inst)
+	if not inst:IsA("ModuleScript") then
+		return
+	end
+
+	cacheBuilt = false
+	requiredModuleCache[inst.Name] = nil
+end)
+
+LocalHandler.DescendantRemoving:Connect(function(inst)
+	if not inst:IsA("ModuleScript") then
+		return
+	end
+
+	cacheBuilt = false
+	requiredModuleCache[inst.Name] = nil
+end)
 
 local function getRequiredModule(moduleName: string)
 	local cached = requiredModuleCache[moduleName]
@@ -35,12 +100,12 @@ local function getRequiredModule(moduleName: string)
 	end
 
 	local moduleScript = moduleScriptCache[moduleName]
-	if not moduleScript or not moduleScript.Parent then
-		moduleScript = findModuleDeep(LocalHandler, moduleName)
+	if not moduleScript or not moduleScript.Parent or ambiguousModuleNames[moduleName] then
+		local resolveErr = nil
+		moduleScript, resolveErr = getIndexedModule(moduleName)
 		if not moduleScript then
-			return nil, ("[Replication] ModuleScript '%s' not found under LocalHandler (deep)"):format(moduleName)
+			return nil, resolveErr
 		end
-		moduleScriptCache[moduleName] = moduleScript
 	end
 
 	local ok, requiredmodule = pcall(require, moduleScript)

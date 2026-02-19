@@ -2,6 +2,8 @@ local module = {}
 
 local rp = game:GetService("ReplicatedStorage")
 local RNS = game:GetService("RunService")
+local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 
 local LiveOParams = OverlapParams.new()
 LiveOParams.FilterType = Enum.RaycastFilterType.Include
@@ -66,6 +68,7 @@ local function Hitbox(Params)
 	local player = Params.Player
 	local touchedCharacters = {}
 	local closestCharacter = nil
+	local closestDistanceSq = math.huge
 
 	local function resolveForPlayer(obj)
 		local base = resolveCFrame(obj)
@@ -113,12 +116,16 @@ local function Hitbox(Params)
 		end
 		local HitboxCFrame = baseCFrame * Params.Offset
 		local touchingParts = workspace:GetPartBoundsInBox(HitboxCFrame, Params.Size, LiveOParams)
+		local origin = HitboxCFrame.Position
 		for _, Part in touchingParts do
 			if Part and Part.Parent then
-				local EnemyCharacter: Model = Part.Parent
+				local EnemyCharacter: Model? = Part:FindFirstAncestorOfClass("Model")
+				if not EnemyCharacter then
+					continue
+				end
 
-				local Player = game.Players:GetPlayerFromCharacter(EnemyCharacter)
-				if Player and not Player:FindFirstChild("LoadedData") then
+				local Player = Players:GetPlayerFromCharacter(EnemyCharacter)
+				if Player and not CollectionService:HasTag(Player, "Loaded") then
 					continue
 				end
 
@@ -130,9 +137,12 @@ local function Hitbox(Params)
 				then
 					table.insert(touchedCharacters, EnemyCharacter)
 
-					if closestCharacter ~= nil then
-						closestCharacter = EnemyCharacter
-					else
+					local root = EnemyCharacter:FindFirstChild("HumanoidRootPart")
+					local enemyPos = (root and root:IsA("BasePart")) and root.Position or EnemyCharacter:GetPivot().Position
+					local delta = enemyPos - origin
+					local distSq = delta:Dot(delta)
+					if distSq < closestDistanceSq then
+						closestDistanceSq = distSq
 						closestCharacter = EnemyCharacter
 					end
 				end
@@ -209,7 +219,24 @@ function module:Once()
 end
 
 function module:Start(HitboxTime, Destroy)
+	self.StopConnection = false
 	self.Connection = RNS.Heartbeat:Connect(function()
+		if self.StopConnection == true then
+			return
+		end
+
+		local playerCharacter = self.Player.Character
+		if not playerCharacter or not playerCharacter.Parent then
+			return
+		end
+
+		if playerCharacter:GetAttribute("Stunned") == true then
+			return
+		end
+		if playerCharacter:GetAttribute("Attacked") == true then
+			return
+		end
+
 		local TouchedEnemies = Hitbox({
 			Player = self.Player,
 			Instance = self.Instance,
@@ -222,12 +249,6 @@ function module:Start(HitboxTime, Destroy)
 			if TouchedEnemies ~= nil and #TouchedEnemies > 0 then
 				for _, EnemyCharacter: Model in TouchedEnemies do
 					if self.StopConnection == true then
-						return
-					end
-					if self.Player.Character:GetAttribute("Stunned") == true then
-						return
-					end
-					if self.Player.Character:GetAttribute("Attacked") == true then
 						return
 					end
 
@@ -266,14 +287,15 @@ end
 
 function module:Stop()
 	self.StopConnection = true
-end
-
-function module:Destroy()
 	local Connection: RBXScriptConnection = self.Connection
-
 	if Connection then
 		Connection:Disconnect()
 	end
+	self.Connection = nil
+end
+
+function module:Destroy()
+	self:Stop()
 
 	task.spawn(self.functionAfterDestroy)
 

@@ -1,27 +1,10 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local InstanceUtil = require(
+	ReplicatedStorage:WaitForChild("LocalHandler"):WaitForChild("libs"):WaitForChild("Common"):WaitForChild("InstanceUtil")
+)
 
 local module = {}
 local vfxFolder = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("vfx")
-
-local function destroyAfter(inst: Instance?, delaySeconds: number?)
-	if not inst then
-		return
-	end
-
-	local t = tonumber(delaySeconds) or 0
-	if t <= 0 then
-		if inst.Parent then
-			inst:Destroy()
-		end
-		return
-	end
-
-	task.delay(t, function()
-		if inst and inst.Parent then
-			inst:Destroy()
-		end
-	end)
-end
 
 module.Slide = function(params)
 	local char = params[1]
@@ -49,7 +32,7 @@ module.Slide = function(params)
 		end
 	else
 		char[extra[1]]:FindFirstChild("Slide").dust.Enabled = false
-		destroyAfter(char[extra[1]]:WaitForChild("Slide"), 0)
+		InstanceUtil.DestroyAfter(char[extra[1]]:WaitForChild("Slide"), 0)
 	end
 end
 
@@ -93,7 +76,7 @@ module.SlideJump = function(params)
 		end
 	end
 
-	destroyAfter(emitPart, 3)
+	InstanceUtil.DestroyAfter(emitPart, 3)
 end
 
 module.SlideJump2 = function(params)
@@ -106,7 +89,7 @@ module.SlideJump2 = function(params)
 	local effect = emitPart.Attachment:Clone()
 	effect.Parent = char:WaitForChild("HumanoidRootPart")
 	effect.CFrame = CFrame.new(0, -3, 0)
-	destroyAfter(effect, 5)
+	InstanceUtil.DestroyAfter(effect, 5)
 
 	for _, particle in pairs(effect:GetDescendants()) do
 		if particle:IsA("ParticleEmitter") then
@@ -134,7 +117,7 @@ module.WallRun = function(params)
 		char[extra[1]]:FindFirstChild("WallRun").dust.Enabled = true
 	else
 		char[extra[1]]:FindFirstChild("WallRun").dust.Enabled = false
-		destroyAfter(char[extra[1]]:WaitForChild("WallRun"), 0)
+		InstanceUtil.DestroyAfter(char[extra[1]]:WaitForChild("WallRun"), 0)
 	end
 end
 
@@ -145,7 +128,7 @@ module.Fall = function(params)
 	local effect = emitPart.Attachment:Clone()
 	effect.Parent = char:WaitForChild("HumanoidRootPart")
 	effect.CFrame = CFrame.new(0, -3, 0)
-	destroyAfter(effect, 5)
+	InstanceUtil.DestroyAfter(effect, 5)
 
 	for _, particle in pairs(effect:GetDescendants()) do
 		particle:Emit(particle:GetAttribute("EmitCount"))

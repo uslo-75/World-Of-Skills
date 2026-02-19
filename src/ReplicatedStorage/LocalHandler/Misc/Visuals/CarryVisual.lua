@@ -6,12 +6,13 @@ local AnimationHandler = require(RS:WaitForChild("Modules"):WaitForChild("Shared
 
 local CarryVisual = {}
 
-local active: { [BasePart]: RBXScriptConnection } = {}
+local active: { [BasePart]: { carrier: BasePart, offset: CFrame } } = {}
 local pending: {
 	[BasePart]: { carrier: BasePart, offset: CFrame, animId: string?, conns: { RBXScriptConnection } },
 } =
 	{}
 local animTargets: { [BasePart]: Model } = {}
+local updaterConn: RBXScriptConnection? = nil
 
 local CARRY_ANIM_TYPE = "CarryVisual"
 local CARRY_TRACK_NAME = "Carried"
@@ -25,6 +26,37 @@ local function disconnectAll(conns: { RBXScriptConnection }?)
 			c:Disconnect()
 		end
 	end
+end
+
+local function stopUpdaterIfIdle()
+	if next(active) ~= nil then
+		return
+	end
+
+	if updaterConn then
+		updaterConn:Disconnect()
+		updaterConn = nil
+	end
+end
+
+local function ensureUpdater()
+	if updaterConn then
+		return
+	end
+
+	updaterConn = RunService.RenderStepped:Connect(function()
+		for targetHrp, state in pairs(active) do
+			local carrierHrp = state.carrier
+			if not carrierHrp or not carrierHrp.Parent or not targetHrp.Parent then
+				CarryVisual.Stop(targetHrp)
+				continue
+			end
+
+			targetHrp.CFrame = carrierHrp.CFrame * state.offset
+			targetHrp.AssemblyLinearVelocity = carrierHrp.AssemblyLinearVelocity
+			targetHrp.AssemblyAngularVelocity = carrierHrp.AssemblyAngularVelocity
+		end
+	end)
 end
 
 local function playCarryAnim(targetHrp: BasePart, animId: string?)
@@ -74,27 +106,15 @@ function CarryVisual.Start(carrierHrp: BasePart, targetHrp: BasePart, offset: CF
 	if localPlayer and localPlayer.Character and targetHrp:IsDescendantOf(localPlayer.Character) then
 		return
 	end
-	local conn: RBXScriptConnection? = nil
 
-	conn = RunService.RenderStepped:Connect(function()
-		if not carrierHrp.Parent or not targetHrp.Parent then
-			CarryVisual.Stop(targetHrp)
-			return
-		end
-
-		targetHrp.CFrame = carrierHrp.CFrame * useOffset
-		targetHrp.AssemblyLinearVelocity = carrierHrp.AssemblyLinearVelocity
-		targetHrp.AssemblyAngularVelocity = carrierHrp.AssemblyAngularVelocity
-	end)
-
-	active[targetHrp] = conn
+	active[targetHrp] = {
+		carrier = carrierHrp,
+		offset = useOffset,
+	}
+	ensureUpdater()
 end
 
 function CarryVisual.Stop(targetHrp: BasePart)
-	local conn = targetHrp and active[targetHrp]
-	if conn then
-		conn:Disconnect()
-	end
 	if targetHrp then
 		active[targetHrp] = nil
 	end
@@ -109,6 +129,8 @@ function CarryVisual.Stop(targetHrp: BasePart)
 		AnimationHandler.StopAnims(targetChar, CARRY_ANIM_TYPE)
 		animTargets[targetHrp] = nil
 	end
+
+	stopUpdaterIfIdle()
 end
 
 return CarryVisual

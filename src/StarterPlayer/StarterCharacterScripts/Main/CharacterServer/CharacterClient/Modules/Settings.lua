@@ -4,6 +4,7 @@ local Settings = {
 		lastMouseButton2Pressed = nil,
 		TimeToFeint = 0.25,
 		blockCooldown = 0.5,
+		blockWalkSpeed = 6,
 	},
 
 	Run = {

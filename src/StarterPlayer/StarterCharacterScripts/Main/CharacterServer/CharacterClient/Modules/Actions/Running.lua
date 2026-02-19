@@ -11,6 +11,14 @@ function ActionsRunning.Bind(module, context)
 	local isGripBlocked = context.isGripBlocked
 	local setMomentumVfx = context.setMomentumVfx
 
+	local function isDefenseActive(plr: Player, char: Model): boolean
+		if char:GetAttribute("isBlocking") == true or char:GetAttribute("Parrying") == true then
+			return true
+		end
+
+		return StateManager.GetState(plr, "isBlocking") == true or StateManager.GetState(plr, "Parrying") == true
+	end
+
 	function module.Running(action: string, plr: Player, _toolname: string?)
 		local char = plr.Character
 		if not char then
@@ -24,6 +32,9 @@ function ActionsRunning.Bind(module, context)
 
 		if action == "Play" then
 			if isGripBlocked(plr) then
+				return
+			end
+			if isDefenseActive(plr, char) then
 				return
 			end
 			if landingLock[char] then

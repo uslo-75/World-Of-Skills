@@ -21,6 +21,14 @@ function ActionsSlide.Bind(module, context)
 	local scriptRef = context.script
 	local sounds = scriptRef.Parent.Parent.Sounds
 
+	local function isDefenseActive(plr: Player, char: Model): boolean
+		if char:GetAttribute("isBlocking") == true or char:GetAttribute("Parrying") == true then
+			return true
+		end
+
+		return StateManager.GetState(plr, "isBlocking") == true or StateManager.GetState(plr, "Parrying") == true
+	end
+
 	local function stopSlideConn(plr: Player)
 		slideConnManager:Disconnect(plr)
 	end
@@ -53,6 +61,9 @@ function ActionsSlide.Bind(module, context)
 			return false
 		end
 		if isCarryOrGripBlocked(plr) then
+			return false
+		end
+		if isDefenseActive(plr, char) then
 			return false
 		end
 		if StateManager.GetState(plr, "Sliding") ~= true then
@@ -160,6 +171,9 @@ function ActionsSlide.Bind(module, context)
 			return false
 		end
 		if isCarryOrGripBlocked(plr) then
+			return false
+		end
+		if isDefenseActive(plr, char) then
 			return false
 		end
 
@@ -335,6 +349,9 @@ function ActionsSlide.Bind(module, context)
 
 		if action == "Play" then
 			if StateManager.GetState(plr, "Crouching") == true then
+				return false
+			end
+			if isDefenseActive(plr, char) then
 				return false
 			end
 			if StateManager.GetState(plr, "Sliding") == true then

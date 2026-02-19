@@ -75,6 +75,7 @@ function module.LoadAnim(
 		reuseTrack: boolean?,
 		fadeTime: number?,
 		priority: Enum.AnimationPriority?,
+		looped: boolean?,
 	}?
 )
 	if not char or not _type then
@@ -97,6 +98,7 @@ function module.LoadAnim(
 	local reuseTrack = opts.reuseTrack == true
 	local fadeTime = opts.fadeTime
 	local priority = opts.priority
+	local looped = opts.looped
 
 	local charBucket = module.Anims[char]
 	if not charBucket then
@@ -124,6 +126,9 @@ function module.LoadAnim(
 	if reuseTrack and existing and existing.Track then
 		if priority then
 			existing.Track.Priority = priority
+		end
+		if looped ~= nil then
+			existing.Track.Looped = looped
 		end
 		if fadeTime ~= nil then
 			existing.Track:Play(fadeTime)
@@ -176,6 +181,9 @@ function module.LoadAnim(
 
 	if priority then
 		track.Priority = priority
+	end
+	if looped ~= nil then
+		track.Looped = looped
 	end
 	if fadeTime ~= nil then
 		track:Play(fadeTime)

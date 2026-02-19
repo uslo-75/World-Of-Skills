@@ -1,5 +1,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local SnapshotUtil = require(script.Parent:WaitForChild("SnapshotUtil"))
+
 local InventoryNet = {}
 InventoryNet.__index = InventoryNet
 
@@ -12,7 +14,9 @@ function InventoryNet.new(deps)
 	self._remote = nil
 	self._lastReqAt = {} -- [player] = os.clock()
 	self._lastSyncAt = {} -- [player] = os.clock()
-	self._lastHash = {} -- [player] = string
+	self._lastHash = {} -- [player] = hash string
+	self._pendingSync = {} -- [player] = {reason, requestId}
+	self._flushScheduled = {} -- [player] = true
 
 	return self
 end
@@ -36,10 +40,6 @@ function InventoryNet:_getRemote()
 	return nil
 end
 
-local function hashSnapshot(snapshot)
-	return tostring(snapshot.count) .. "|" .. tostring(snapshot.maxCapacity) .. "|" .. tostring(#snapshot.items)
-end
-
 function InventoryNet:CanRequest(player: Player)
 	local now = os.clock()
 	local last = self._lastReqAt[player]
@@ -50,49 +50,108 @@ function InventoryNet:CanRequest(player: Player)
 	return true
 end
 
-function InventoryNet:PushSnapshot(player: Player, reason: string?, requestId: any?)
+function InventoryNet:_dispatchSnapshot(player: Player, reason: string?, requestId: any?)
 	local remote = self:_getRemote()
 	if not remote then
 		return
 	end
-
-	local now = os.clock()
-	local last = self._lastSyncAt[player]
-	if last and (now - last) < self.Config.MinSyncInterval then
+	if player.Parent == nil then
 		return
 	end
-	self._lastSyncAt[player] = now
 
-	local snapshot = self.Service:BuildSnapshot(player)
+	local normalizedReason = SnapshotUtil.NormalizeReason(reason)
+	local includeItems = SnapshotUtil.ShouldIncludeItems(normalizedReason, self.Config)
+
+	local snapshot = self.Service:BuildSnapshot(player, {
+		includeItems = includeItems,
+	})
 	if not snapshot then
 		return
 	end
 
-	local h = hashSnapshot(snapshot)
-	if reason ~= "request" and self._lastHash[player] == h then
+	local hash = SnapshotUtil.ComputeHash(snapshot)
+	if normalizedReason ~= "request" and self._lastHash[player] == hash then
 		return
 	end
-	self._lastHash[player] = h
 
-	remote:FireClient(player, self.Config.SyncEventName, {
-		reason = reason or "sync",
-		requestId = requestId,
-		snapshot = snapshot,
-	})
+	self._lastHash[player] = hash
+	self._lastSyncAt[player] = os.clock()
+
+	local payload = SnapshotUtil.BuildPayload(normalizedReason, requestId, snapshot)
+	remote:FireClient(player, self.Config.SyncEventName, payload)
+end
+
+function InventoryNet:_queuePendingSnapshot(player: Player, reason: string?, requestId: any?, delaySeconds: number)
+	if self.Config.EnableSnapshotCoalescing == false then
+		return
+	end
+
+	local queued = self._pendingSync[player]
+	if queued then
+		queued.reason = SnapshotUtil.MergeReason(queued.reason, reason)
+		if SnapshotUtil.NormalizeReason(reason) == "request" then
+			queued.requestId = requestId
+		end
+	else
+		self._pendingSync[player] = {
+			reason = reason,
+			requestId = requestId,
+		}
+	end
+
+	if self._flushScheduled[player] then
+		return
+	end
+	self._flushScheduled[player] = true
+
+	local delayTime = math.max(0, tonumber(delaySeconds) or self.Config.MinSyncInterval or 0)
+	task.delay(delayTime, function()
+		self._flushScheduled[player] = nil
+		if player.Parent == nil then
+			self._pendingSync[player] = nil
+			return
+		end
+
+		local pending = self._pendingSync[player]
+		self._pendingSync[player] = nil
+		if not pending then
+			return
+		end
+
+		self:PushSnapshot(player, pending.reason, pending.requestId)
+	end)
+end
+
+function InventoryNet:PushSnapshot(player: Player, reason: string?, requestId: any?)
+	local minInterval = math.max(0, tonumber(self.Config.MinSyncInterval) or 0)
+	local now = os.clock()
+	local last = self._lastSyncAt[player]
+
+	if last and (now - last) < minInterval then
+		local remaining = minInterval - (now - last)
+		self:_queuePendingSnapshot(player, reason, requestId, remaining)
+		return
+	end
+
+	self:_dispatchSnapshot(player, reason, requestId)
 end
 
 function InventoryNet:Bind()
+	if self.Config.UseStandaloneRequestListener ~= true then
+		return
+	end
+
 	local remote = self:_getRemote()
 	if not remote then
 		return
 	end
 
 	remote.OnServerEvent:Connect(function(player: Player, actionOrEvent, payload)
-		local payloadTable = payload
-		if typeof(actionOrEvent) == "string" and actionOrEvent ~= self.Config.SyncEventName then
+		if actionOrEvent ~= "inventory" then
+			return
 		end
 
-		if typeof(payloadTable) ~= "table" then
+		if typeof(payload) ~= "table" then
 			return
 		end
 
@@ -100,7 +159,7 @@ function InventoryNet:Bind()
 			return
 		end
 
-		self.Service:HandleRemoteRequest(player, payloadTable)
+		self.Service:HandleRemoteRequest(player, payload)
 	end)
 end
 
@@ -108,6 +167,8 @@ function InventoryNet:CleanupPlayer(player: Player)
 	self._lastReqAt[player] = nil
 	self._lastSyncAt[player] = nil
 	self._lastHash[player] = nil
+	self._pendingSync[player] = nil
+	self._flushScheduled[player] = nil
 end
 
 return InventoryNet

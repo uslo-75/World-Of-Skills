@@ -1,6 +1,7 @@
 return {
 	AnimFolder = "GripFolder",
 	CarryOffset = CFrame.new(2, 1.5, 0),
+	VisualReplicationRadius = 180,
 
 	Align = {
 		Responsiveness = 400,

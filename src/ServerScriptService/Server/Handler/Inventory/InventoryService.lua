@@ -1,4 +1,7 @@
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CombatStateRules =
+	require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Shared"):WaitForChild("CombatStateRules"))
 
 local InventoryService = {}
 InventoryService.__index = InventoryService
@@ -9,6 +12,7 @@ function InventoryService.new(deps)
 	self.Config = deps.Config
 	self.DataManager = deps.DataManager
 	self.ToolFactory = deps.ToolFactory
+	self.WeaponService = deps.WeaponService
 	self.DropService = deps.DropService
 	self.Net = deps.Net
 
@@ -94,25 +98,12 @@ local function findToolByQuery(player: Player, query: string)
 	return nil
 end
 
-function InventoryService:BuildSnapshot(player: Player)
-	local items = self.DataManager.GetInventorySnapshot(player)
+function InventoryService:BuildSnapshot(player: Player, options)
+	options = options or {}
+	local includeItems = options.includeItems == true
+
 	local count = self.DataManager.GetInventoryCount(player)
 	local cap = self.DataManager.GetInventoryCapacity(player)
-
-	-- Réduction bandwidth : on n’envoie pas des stats tables lourdes, juste statsRaw
-	local compact = table.create(math.min(#items, self.Config.MaxItemsInSnapshot))
-	for i = 1, math.min(#items, self.Config.MaxItemsInSnapshot) do
-		local it = items[i]
-		compact[i] = {
-			id = it.id,
-			name = it.name,
-			statsRaw = it.statsRaw or it.stats, -- si stats déjà string, ok
-			enchant = it.enchant,
-			type = it.type,
-			rarity = it.rarity,
-			description = it.description,
-		}
-	end
 
 	local selectedSlot = 1
 	local profile = self.DataManager.Profiles[player]
@@ -120,12 +111,32 @@ function InventoryService:BuildSnapshot(player: Player)
 		selectedSlot = math.max(1, math.floor(tonumber(profile.Data.SelectedSlot) or 1))
 	end
 
-	return {
-		items = compact,
+	local snapshot = {
 		count = count,
 		maxCapacity = cap,
 		selectedSlot = selectedSlot,
 	}
+
+	if includeItems then
+		local items = self.DataManager.GetInventorySnapshot(player)
+		local maxItems = math.min(#items, self.Config.MaxItemsInSnapshot)
+		local compact = table.create(maxItems)
+		for i = 1, maxItems do
+			local it = items[i]
+			compact[i] = {
+				id = it.id,
+				name = it.name,
+				statsRaw = it.statsRaw or it.stats,
+				enchant = it.enchant,
+				type = it.type,
+				rarity = it.rarity,
+				description = it.description,
+			}
+		end
+		snapshot.items = compact
+	end
+
+	return snapshot
 end
 
 function InventoryService:LoadPlayerInventory(player: Player)
@@ -155,6 +166,10 @@ function InventoryService:LoadPlayerInventory(player: Player)
 		if tool then
 			tool.Parent = backpack
 		end
+	end
+
+	if self.WeaponService and self.WeaponService.OnInventoryLoaded then
+		self.WeaponService:OnInventoryLoaded(player)
 	end
 
 	self:_updateStats(player)
@@ -251,16 +266,7 @@ local function isEquipBlocked(player: Player): boolean
 	if not char then
 		return true
 	end
-	if char:GetAttribute("Downed") == true then
-		return true
-	end
-	if char:GetAttribute("Carrying") == true then
-		return true
-	end
-	if char:GetAttribute("Carried") == true then
-		return true
-	end
-	return false
+	return CombatStateRules.IsEquipBlocked(char)
 end
 
 local function normalizedQuery(value): string?
@@ -312,6 +318,9 @@ function InventoryService:DropEquippedTool(player: Player, payload)
 	local tool = char:FindFirstChildWhichIsA("Tool")
 	if not tool then
 		return true, "NoEquippedTool"
+	end
+	if tool:FindFirstChild("EquipedWeapon") ~= nil then
+		return true, "SelectedWeaponCannotDrop"
 	end
 
 	local serialized = self.ToolFactory:SerializeTool(tool)
@@ -396,6 +405,37 @@ function InventoryService:HandleRemoteRequest(player: Player, payload)
 		return false, "ToolNotFound"
 	end
 
+	if action == "equipWeapon" then
+		if isEquipBlocked(player) then
+			return true, "BlockedState"
+		end
+		if not self.WeaponService or not self.WeaponService.SelectWeapon then
+			return false, "WeaponServiceMissing"
+		end
+
+		local query = tostring(payload.itemId or payload.itemName or "")
+		local tool = findToolByQuery(player, query)
+		local char = player.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if not tool then
+			return false, "ToolNotFound"
+		end
+		if not char or tool.Parent ~= char then
+			return false, "ToolNotEquipped"
+		end
+
+		local ok, err = self.WeaponService:SelectWeapon(player, tool)
+		if not ok then
+			return false, err or "WeaponEquipFailed"
+		end
+
+		if hum then
+			hum:UnequipTools()
+		end
+
+		return true
+	end
+
 	if action == "unequip" then
 		if isEquipBlocked(player) then
 			return true, "BlockedState"
@@ -454,3 +494,4 @@ function InventoryService:Init()
 end
 
 return InventoryService
+

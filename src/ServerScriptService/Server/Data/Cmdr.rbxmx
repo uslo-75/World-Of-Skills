@@ -1,0 +1,5656 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+	<Meta name="ExplicitAutoJoints">true</Meta>
+	<External>null</External>
+	<External>nil</External>
+	<Item class="ModuleScript" referent="RBX06AE5AE483404DF58C703247F0300358">
+		<Properties>
+			<Content name="LinkedSource"><null></null></Content>
+			<ProtectedString name="Source"><![CDATA[local RunService = game:GetService("RunService")
+local Util = require(script.Shared:WaitForChild("Util"))
+
+if RunService:IsServer() == false then
+	error("Cmdr server module is somehow running on a client!")
+end
+
+local Cmdr do
+	Cmdr = setmetatable({
+		ReplicatedRoot = nil;
+		RemoteFunction = nil;
+		RemoteEvent = nil;
+		Util = Util;
+		DefaultCommandsFolder = script.BuiltInCommands;
+	}, {
+		__index = function (self, k)
+			local r = self.Registry[k]
+			if r and type(r) == "function" then
+				return function (_, ...)
+					return r(self.Registry, ...)
+				end
+			end
+		end
+	})
+
+	Cmdr.Registry = require(script.Shared.Registry)(Cmdr)
+	Cmdr.Dispatcher = require(script.Shared.Dispatcher)(Cmdr)
+
+	require(script.Initialize)(Cmdr)
+end
+
+-- Handle command invocations from the clients.
+Cmdr.RemoteFunction.OnServerInvoke = function (player, text, options)
+	if #text > 100_000 then
+		return "Input too long"
+	end
+
+	return Cmdr.Dispatcher:EvaluateAndRun(text, player, options)
+end
+
+return Cmdr]]></ProtectedString>
+			<string name="ScriptGuid">{07EDE076-B2F2-4EBB-8DF0-70EF13B090FE}</string>
+			<BinaryString name="AttributesSerialize"></BinaryString>
+			<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+			<bool name="DefinesCapabilities">false</bool>
+			<string name="Name">Cmdr</string>
+			<int64 name="SourceAssetId">-1</int64>
+			<BinaryString name="Tags"></BinaryString>
+		</Properties>
+		<Item class="Folder" referent="RBXAFB0F616DFEB4A65B46B12326FFA355D">
+			<Properties>
+				<BinaryString name="AttributesSerialize"></BinaryString>
+				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+				<bool name="DefinesCapabilities">false</bool>
+				<string name="Name">BuiltInCommands</string>
+				<int64 name="SourceAssetId">-1</int64>
+				<BinaryString name="Tags"></BinaryString>
+			</Properties>
+			<Item class="Folder" referent="RBXA49ACB19E53F4DF69B752961F54A6ED4">
+				<Properties>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Admin</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+				<Item class="ModuleScript" referent="RBXCDEFE8199DCE443D8E157F57FB6FB939">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "announce";
+	Aliases = {"m"};
+	Description = "Makes a server-wide announcement.";
+	Group = "DefaultAdmin";
+	Args = {
+		{
+			Type = "string";
+			Name = "text";
+			Description = "The announcement text.";
+		},
+	};
+}]]></ProtectedString>
+						<string name="ScriptGuid">{4A074655-8F33-4861-8D5F-8CE949E8F918}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">announce</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXABDD590FF9CB496998E109D5E54A448D">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local TextService = game:GetService("TextService")
+local Players = game:GetService("Players")
+local Chat = game:GetService("Chat")
+
+return function (context, text)
+	local filterResult = TextService:FilterStringAsync(text, context.Executor.UserId, Enum.TextFilterContext.PublicChat)
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if Chat:CanUsersChatAsync(context.Executor.UserId, player.UserId) then
+			context:SendEvent(player, "Message", filterResult:GetChatForUserAsync(player.UserId), context.Executor)
+		end
+	end
+
+	return "Created announcement."
+end]]></ProtectedString>
+						<string name="ScriptGuid">{E4AD0995-AE18-4CA0-9BE6-9EE9E6161102}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">announceServer</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX5F923D419F1A4857A497E3EE6952B0CC">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "goto-place";
+	Aliases = {};
+	Description = "Teleport to a Roblox place";
+	Group = "DefaultAdmin";
+	AutoExec = {
+		"alias \"follow-player|Join a player in another server\" goto-place $1{players|Players} ${{get-player-place-instance $2{playerId|Target}}}",
+		"alias \"rejoin|Rejoin this place. You might end up in a different server.\" goto-place $1{players|Players} ${get-player-place-instance ${me} PlaceId}"
+	};
+	Args = {
+		{
+			Type = "players";
+			Name = "Players";
+			Description = "The players you want to teleport";
+		},
+		{
+			Type = "integer";
+			Name = "Place ID";
+			Description = "The Place ID you want to teleport to";
+		},
+		{
+			Type = "string";
+			Name = "JobId";
+			Description = "The specific JobId you want to teleport to";
+			Optional = true;
+		}
+	};
+}]]></ProtectedString>
+						<string name="ScriptGuid">{6A1F3ACA-9A93-4D68-A972-0A8BD7AF5F8B}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">gotoPlace</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXA22AA732A5AA4B1281D73B3607151A3E">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local TeleportService = game:GetService("TeleportService")
+
+return function(context, players, placeId, jobId)
+	players = players or { context.Executor }
+
+	if placeId <= 0 then
+		return "Invalid place ID"
+	elseif jobId == "-" then
+		return "Invalid job ID"
+	end
+
+	context:Reply("Commencing teleport...")
+
+	if jobId then
+		for _, player in ipairs(players) do
+			TeleportService:TeleportToPlaceInstance(placeId, jobId, player)
+		end
+	else
+		TeleportService:TeleportAsync(placeId, players)
+	end
+
+	return "Teleported."
+end
+]]></ProtectedString>
+						<string name="ScriptGuid">{C4639EAD-35BD-4039-B179-55441289C8F7}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">gotoPlaceServer</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX28E236C6E458417782328FFBB41D698F">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "kick";
+	Aliases = {"boot"};
+	Description = "Kicks a player or set of players.";
+	Group = "DefaultAdmin";
+	Args = {
+		{
+			Type = "players";
+			Name = "players";
+			Description = "The players to kick.";
+		},
+	};
+}]]></ProtectedString>
+						<string name="ScriptGuid">{832633D2-5E75-44DF-AF83-364DE5CD73A4}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">kick</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX666E877AF3D7496BB28380D6DAC7392E">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return function (_, players)
+	for _, player in pairs(players) do
+		player:Kick("Kicked by admin.")
+	end
+
+	return ("Kicked %d players."):format(#players)
+end]]></ProtectedString>
+						<string name="ScriptGuid">{FC61FE6C-577B-4BCB-9F2D-64AAEAFA3206}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">kickServer</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXDA1519AFC5D74593B6C9151E8470DB09">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "kill";
+	Aliases = {"slay"};
+	Description = "Kills a player or set of players.";
+	Group = "DefaultAdmin";
+	Args = {
+		{
+			Type = "players";
+			Name = "victims";
+			Description = "The players to kill.";
+		},
+	};
+}]]></ProtectedString>
+						<string name="ScriptGuid">{E331FB40-0579-445B-B1D9-056ACD46003E}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">kill</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXF3DC3AD0FC85418093F7DD917E59CE38">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return function (_, players)
+	for _, player in pairs(players) do
+		if player.Character then
+			player.Character:BreakJoints()
+		end
+	end
+
+	return ("Killed %d players."):format(#players)
+end]]></ProtectedString>
+						<string name="ScriptGuid">{9CED2CC9-53A9-4024-8609-D593EDB53F8A}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">killServer</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXE5AACCCB15BA451E986D59E503448610">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "respawn";
+	Description = "Respawns a player or a group of players.";
+	Group = "DefaultAdmin";
+	AutoExec = {
+		"alias \"refresh|Respawns the player and returns them to their previous location.\" var= .refresh_pos ${position $1{player|Player}} && respawn $1 && tp $1 @${{var .refresh_pos}}"
+	},
+	Args = {
+		{
+			Type = "players";
+			Name = "targets";
+			Description = "The players to respawn."
+		}
+	}
+}
+]]></ProtectedString>
+						<string name="ScriptGuid">{D6CE384F-301E-45F6-B75E-6B27567ADB64}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">respawn</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX6608B027159441AAA3AA5FDD3409029A">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return function(_, players)
+	for _, player in pairs(players) do
+		if player.Character then
+			player:LoadCharacter()
+		end
+	end
+	return ("Respawned %d players."):format(#players)
+end
+]]></ProtectedString>
+						<string name="ScriptGuid">{7B0170BC-7082-47F5-83D7-E3A2CD340C10}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">respawnServer</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX12F5AE2A2D42443C924A1D024F866A2E">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "teleport";
+	Aliases = {"tp"};
+	Description = "Teleports a player or set of players to one target.";
+	Group = "DefaultAdmin";
+	AutoExec = {
+		"alias \"bring|Brings a player or set of players to you.\" teleport $1{players|players|The players to bring} ${me}";
+		"alias \"to|Teleports you to another player or location.\" teleport ${me} $1{player @ vector3|Destination|The player or location to teleport to}";
+	};
+	Args = {
+		{
+			Type = "players";
+			Name = "From";
+			Description = "The players to teleport";
+		},
+		{
+			Type = "player @ vector3";
+			Name = "Destination";
+			Description = "The player to teleport to"
+		}
+	};
+}]]></ProtectedString>
+						<string name="ScriptGuid">{A0BC38AD-F24A-44B3-9F4C-DF87452253E8}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">teleport</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX7D04480013DA4CEEA7283A5157F1FD88">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return function (_, fromPlayers, destination)
+	local cframe
+
+	if typeof(destination) == "Instance" then
+		if destination.Character and destination.Character:FindFirstChild("HumanoidRootPart") then
+			cframe = destination.Character.HumanoidRootPart.CFrame
+		else
+			return "Target player has no character."
+		end
+	elseif typeof(destination) == "Vector3" then
+		cframe = CFrame.new(destination)
+	end
+
+	for _, player in ipairs(fromPlayers) do
+		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			player.Character.HumanoidRootPart.CFrame = cframe
+		end
+	end
+
+	return ("Teleported %d players."):format(#fromPlayers)
+end
+]]></ProtectedString>
+						<string name="ScriptGuid">{8008F599-A44D-4D28-ADA5-88A5135B3D3E}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">teleportServer</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+			</Item>
+			<Item class="Folder" referent="RBX04B88EB71E2A42E987C14B0F9E598D31">
+				<Properties>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Debug</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+				<Item class="ModuleScript" referent="RBX486D7A9E4F9B4757B320F64267679A55">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "blink";
+	Aliases = {"b"};
+	Description = "Teleports you to where your mouse is hovering.";
+	Group = "DefaultDebug";
+	Args = {};
+
+	ClientRun = function(context)
+		-- We implement this here because player position is owned by the client.
+		-- No reason to bother the server for this!
+
+		local mouse = context.Executor:GetMouse()
+		local character = context.Executor.Character
+
+		if not character then
+			return "You don't have a character."
+		end
+
+		character:MoveTo(mouse.Hit.p)
+
+		return "Blinked!"
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{36E3E9E1-BFD5-4BA4-A405-D05DE8509453}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">blink</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX9486F61FA20D4D5A8E0C208DEC07706A">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "fetch";
+	Aliases = {};
+	Description = "Fetch a value from the Internet";
+	Group = "DefaultDebug";
+	Args = {
+		{
+			Type = "url";
+			Name = "URL";
+			Description = "The URL to fetch.";
+		}
+	};
+}]]></ProtectedString>
+						<string name="ScriptGuid">{A38996BD-F665-4122-956B-D78EDD5BF6BF}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">fetch</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX421E4890C82B48D8B458B966BC962F6B">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local HttpService = game:GetService("HttpService")
+
+return function (_, url)
+	return HttpService:GetAsync(url)
+end]]></ProtectedString>
+						<string name="ScriptGuid">{318A6FBA-63D9-4637-B6D2-BA8C44C0E0C1}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">fetchServer</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX85996CDA86784CB7BF926428AA9895C1">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "get-player-place-instance";
+	Aliases = {};
+	Description = "Returns the target player's Place ID and the JobId separated by a space. Returns 0 if the player is offline or something else goes wrong.";
+	Group = "DefaultDebug";
+	Args = {
+		{
+			Type = "playerId";
+			Name = "Player";
+			Description = "Get the place instance of this player";
+		},
+		function(context)
+			return {
+				Type = context.Cmdr.Util.MakeEnumType("PlaceInstance Format", {"PlaceIdJobId", "PlaceId", "JobId"}),
+				Name = "Format";
+				Description = "What data to return. PlaceIdJobId returns both separated by a space.";
+				Default = "PlaceIdJobId";
+			}
+		end
+	};
+}]]></ProtectedString>
+						<string name="ScriptGuid">{A8F2EDF2-9CEB-493D-A4E0-45CCB7E38EAC}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">getPlayerPlaceInstance</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX8DAC17F1FF3646F68F3BA8DD515F47EB">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local TeleportService = game:GetService("TeleportService")
+
+return function (_, playerId, format)
+	format = format or "PlaceIdJobId"
+
+	local ok, _, errorText, placeId, jobId = pcall(function()
+		return TeleportService:GetPlayerPlaceInstanceAsync(playerId)
+	end)
+
+	if not ok or (errorText and #errorText > 0) then
+		if format == "PlaceIdJobId" then
+			return "0" .. " -"
+		elseif format == "PlaceId" then
+			return "0"
+		elseif format == "JobId" then
+			return "-"
+		end
+	end
+
+	if format == "PlaceIdJobId" then
+		return placeId .. " " .. jobId
+	elseif format == "PlaceId" then
+		return tostring(placeId)
+	elseif format == "JobId" then
+		return tostring(jobId)
+	end
+end]]></ProtectedString>
+						<string name="ScriptGuid">{6705C4BF-17E1-41B0-8A2B-486F15B47726}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">getPlayerPlaceInstanceServer</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX08FF98AAFC9C4CE79629F8B9CA71B890">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local Players = game:GetService("Players")
+
+return {
+	Name = "position";
+	Aliases = {"pos"};
+	Description = "Returns Vector3 position of you or other players. Empty string is the player has no character.";
+	Group = "DefaultDebug";
+	Args = {
+		{
+			Type = "player";
+			Name = "Player";
+			Description = "The player to report the position of. Omit for your own position.";
+			Default = Players.LocalPlayer;
+		}
+	};
+
+	ClientRun = function(_, player)
+		local character = player.Character
+
+		if not character or not character:FindFirstChild("HumanoidRootPart") then
+			return ""
+		end
+
+		return tostring(character.HumanoidRootPart.Position):gsub("%s", "")
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{677151B1-0874-4CE7-93B5-78E62009F7C2}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">position</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX6432705EAC6D49C0B26257CCF65B265A">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "thru";
+	Aliases = {"t", "through"};
+	Description = "Teleports you through whatever your mouse is hovering over, placing you equidistantly from the wall.";
+	Group = "DefaultDebug";
+	Args = {
+		{
+			Type = "number";
+			Name = "Extra distance";
+			Description = "Go through the wall an additional X studs.";
+			Default = 0;
+		}
+	};
+
+	ClientRun = function(context, extra)
+		-- We implement this here because player position is owned by the client.
+		-- No reason to bother the server for this!
+
+		local mouse = context.Executor:GetMouse()
+		local character = context.Executor.Character
+
+		if not character or not character:FindFirstChild("HumanoidRootPart") then
+			return "You don't have a character."
+		end
+
+		local pos = character.HumanoidRootPart.Position
+		local diff = (mouse.Hit.p - pos)
+
+		character:MoveTo((diff * 2) + (diff.unit * extra) + pos)
+
+		return "Blinked!"
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{F9722A1E-17F1-449A-B62B-B173E62540EE}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">thru</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX9687DED1C3D745B3A6E30DDC9E9D8AE1">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "uptime";
+	Aliases = {};
+	Description = "Returns the amount of time the server has been running.";
+	Group = "DefaultDebug";
+	Args = {};
+}]]></ProtectedString>
+						<string name="ScriptGuid">{A85D2913-2EC3-497B-AE88-706A1A870327}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">uptime</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX28F9A64441AD48B7A291773071529C82">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local startTime = os.time()
+
+return function ()
+	local uptime = os.time() - startTime
+	return ("%dd %dh %dm %ds"):format(
+		math.floor(uptime / (60 * 60 * 24)),
+		math.floor(uptime / (60 * 60)) % 24,
+		math.floor(uptime / 60) % 60,
+		math.floor(uptime) % 60
+	)
+end]]></ProtectedString>
+						<string name="ScriptGuid">{D05A04E8-63D9-42DC-ADF1-4F7EC9F64C76}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">uptimeServer</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX2FAE155733184F239AA4EC32618561B5">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local version = "v1.12.0"
+
+return {
+	Name = "version",
+	Args = {},
+	Description = "Shows the current version of Cmdr",
+	Group = "DefaultDebug",
+
+	Run = function()
+		return ("Cmdr Version %s"):format(version)
+	end,
+}
+]]></ProtectedString>
+						<string name="ScriptGuid">{458E277E-18CD-4324-9A8D-535830691DFB}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">version</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+			</Item>
+			<Item class="Folder" referent="RBX124E1C97F7D34295AFB132CA6A6FF7AE">
+				<Properties>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Utility</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+				<Item class="ModuleScript" referent="RBX65A68117966B466493AFE2C90978621C">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "alias";
+	Aliases = {};
+	Description = "Creates a new, single command out of a command and given arguments.";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "string";
+			Name = "Alias name";
+			Description = "The key or input type you'd like to bind the command to."
+		},
+		{
+			Type = "string";
+			Name = "Command string";
+			Description = "The command text you want to run. Separate multiple commands with \"&&\". Accept arguments with $1, $2, $3, etc."
+		},
+	};
+
+	ClientRun = function(context, name, commandString)
+		context.Cmdr.Registry:RegisterCommandObject(
+			context.Cmdr.Util.MakeAliasCommand(name, commandString),
+			true
+		)
+
+		return ("Created alias %q"):format(name)
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{42E25038-C2E5-4921-AF15-5106BDFC5614}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">alias</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX9FC45A8048E44CA09905A4472A0F13D0">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local UserInputService = game:GetService("UserInputService")
+
+return {
+	Name = "bind";
+	Aliases = {};
+	Description = "Binds a command string to a key or mouse input.";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "userInput ! bindableResource @ player";
+			Name = "Input";
+			Description = "The key or input type you'd like to bind the command to."
+		},
+		{
+			Type = "command";
+			Name = "Command";
+			Description = "The command you want to run on this input"
+		},
+		{
+			Type = "string";
+			Name = "Arguments";
+			Description = "The arguments for the command";
+			Default = "";
+		}
+	};
+
+	ClientRun = function(context, bind, command, arguments)
+		local binds = context:GetStore("CMDR_Binds")
+
+		command = command .. " " .. arguments
+
+		if binds[bind] then
+			binds[bind]:Disconnect()
+		end
+
+		local bindType = context:GetArgument(1).Type.Name
+
+		if bindType == "userInput" then
+			binds[bind] = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+				if gameProcessed then
+					return
+				end
+
+				if input.UserInputType == bind or input.KeyCode == bind then
+					context:Reply(context.Dispatcher:EvaluateAndRun(context.Cmdr.Util.RunEmbeddedCommands(context.Dispatcher, command)))
+				end
+			end)
+		elseif bindType == "bindableResource" then
+			return "Unimplemented..."
+		elseif bindType == "player" then
+			binds[bind] = bind.Chatted:Connect(function(message)
+				local args = { message }
+				local chatCommand = context.Cmdr.Util.RunEmbeddedCommands(context.Dispatcher, context.Cmdr.Util.SubstituteArgs(command, args))
+				context:Reply(("%s $ %s : %s"):format(
+					bind.Name,
+					chatCommand,
+					context.Dispatcher:EvaluateAndRun(chatCommand)
+				), Color3.fromRGB(244, 92, 66))
+			end)
+		end
+
+
+		return "Bound command to input."
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{72067066-B35C-40A8-AD0A-5BF7E6E2EFCA}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">bind</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX9AB0431422B04A978E91C33AB234A5D3">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local Players = game:GetService("Players")
+
+return {
+	Name = "clear",
+	Aliases = {},
+	Description = "Clear all lines above the entry line of the Cmdr window.",
+	Group = "DefaultUtil",
+	Args = {},
+	ClientRun = function()
+		local player = Players.LocalPlayer
+		local gui = player:WaitForChild("PlayerGui"):WaitForChild("Cmdr")
+		local frame = gui:WaitForChild("Frame")
+
+		if gui and frame then
+			for _, child in pairs(frame:GetChildren()) do
+				if child.Name == "Line" and child:IsA("TextBox") then
+					child:Destroy()
+				end
+			end
+		end
+		return ""
+	end
+}
+]]></ProtectedString>
+						<string name="ScriptGuid">{31BBCD72-7B71-4381-96D0-F03937712B7C}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">clear</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX04095F71B09747CFB66D0079989AC23F">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "convertTimestamp";
+	Aliases = { "date" },
+	Description = "Convert a timestamp to a human-readable format.";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "number";
+			Name = "timestamp";
+			Description = "A numerical representation of a specific moment in time.";
+			Optional = true
+		}
+	};
+	ClientRun = function(_, timestamp)
+		timestamp = timestamp or os.time()
+		return `{os.date("%x", timestamp)} {os.date("%X", timestamp)}`
+	end
+}
+]]></ProtectedString>
+						<string name="ScriptGuid">{229F3F21-B843-40E4-A0A3-73D7D3381BC8}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">convertTimestamp</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXB85D472F12104DE6ADC767659D8D4BBE">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "echo";
+	Aliases = {"="};
+	Description = "Echoes your text back to you.";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "string";
+			Name = "Text";
+			Description = "The text."
+		},
+	};
+
+	Run = function(_, text)
+		return text
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{7D785D4D-4DDE-4F9F-B463-652906EF04DD}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">echo</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXD3F3F0B9C78C4978A75C0D00BF60AF10">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local Players = game:GetService("Players")
+
+local TEXT_BOX_PROPERTIES = {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	BackgroundColor3 = Color3.fromRGB(17, 17, 17),
+	BackgroundTransparency = 0.05,
+	BorderColor3 = Color3.fromRGB(17, 17, 17),
+	BorderSizePixel = 20,
+	ClearTextOnFocus = false,
+	MultiLine = true,
+	Position = UDim2.new(0.5, 0, 0.5, 0),
+	Size = UDim2.new(0.5, 0, 0.4, 0),
+	Font = Enum.Font.Code,
+	TextColor3 = Color3.fromRGB(241, 241, 241),
+	TextWrapped = true,
+	TextSize = 18,
+	TextXAlignment = "Left",
+	TextYAlignment = "Top",
+	AutoLocalize = false,
+	PlaceholderText = "Right click to exit",
+}
+
+local lock
+
+return {
+	Name = "edit";
+	Aliases = {};
+	Description = "Edit text in a TextBox";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "string";
+			Name = "Input text";
+			Description = "The text you wish to edit";
+			Default = "";
+		},
+		{
+			Type = "string";
+			Name = "Delimiter";
+			Description = "The character that separates each line";
+			Default = ",";
+		}
+	};
+
+	ClientRun = function(context, text, delimeter)
+		lock = lock or context.Cmdr.Util.Mutex()
+
+		local unlock = lock()
+
+		context:Reply("Right-click on the text area to exit.", Color3.fromRGB(158, 158, 158))
+
+		local screenGui = Instance.new("ScreenGui")
+		screenGui.Name = "CmdrEditBox"
+		screenGui.ResetOnSpawn = false
+
+		local textBox = Instance.new("TextBox")
+
+		for key, value in pairs(TEXT_BOX_PROPERTIES) do
+			textBox[key] = value
+		end
+
+		textBox.Text = text:gsub(delimeter, "\n")
+		textBox.Parent = screenGui
+
+		screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+		local thread = coroutine.running()
+
+		textBox.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton2 then
+				coroutine.resume(thread, textBox.Text:gsub("\n", delimeter))
+				screenGui:Destroy()
+				unlock()
+			end
+		end)
+
+		return coroutine.yield()
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{2601B18B-FABB-4739-A170-690CD61873AE}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">edit</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXE5A815A75849434C92A7B8A2487EB00E">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "history";
+	Aliases = {};
+	AutoExec = {
+		"alias \"!|Displays previous command from history.\" run ${history $1{number|Line Number}}";
+		"alias \"^|Runs the previous command, replacing all occurrences of A with B.\" run ${run replace ${history -1} $1{string|A} $2{string|B}}";
+		"alias \"!!|Reruns the last command.\" ! -1";
+	};
+	Description = "Displays previous commands from history.";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "integer";
+			Name = "Line Number";
+			Description = "Command line number (can be negative to go from end)"
+		},
+	};
+
+	ClientRun = function(context, line)
+		local history = context.Dispatcher:GetHistory()
+
+		if line <= 0 then
+			line = #history + line
+		end
+
+		return history[line] or ""
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{1A642E62-F554-4EB7-B332-CED5953C53C1}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">history</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX54B8A18DDAB548AB8247BD7F15E2697F">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local Players = game:GetService("Players")
+
+return {
+	Name = "hover";
+	Description = "Returns the name of the player you are hovering over.";
+	Group = "DefaultUtil";
+	Args = {};
+
+	ClientRun = function()
+		local mouse = Players.LocalPlayer:GetMouse()
+		local target = mouse.Target
+
+		if not target then
+			return ""
+		end
+
+		local p = Players:GetPlayerFromCharacter(target:FindFirstAncestorOfClass("Model"))
+
+		return p and p.Name or ""
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{DC98DA0F-33D9-4231-82B6-17B08FF4C729}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">hover</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXCE94A97237634590A4F9160A9451008B">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "json-array-decode";
+	Aliases = {};
+	Description = "Decodes a JSON Array into a comma-separated list";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "json";
+			Name = "JSON";
+			Description = "The JSON array."
+		},
+	};
+
+	ClientRun = function(_, value)
+		if type(value) ~= "table" then
+			value = { value }
+		end
+
+		return table.concat(value, ",")
+	end
+}
+]]></ProtectedString>
+						<string name="ScriptGuid">{E481B32C-A484-4DE0-B64E-42E17D13888C}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">jsonArrayDecode</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXF9A754A7ED114180BE152883E8669EC0">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local HttpService = game:GetService("HttpService")
+
+return {
+	Name = "json-array-encode";
+	Aliases = {};
+	Description = "Encodes a comma-separated list into a JSON array";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "string";
+			Name = "CSV";
+			Description = "The comma-separated list"
+		},
+	};
+
+	Run = function(_, text)
+		return HttpService:JSONEncode(text:split(","))
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{237C6DEF-A853-4393-88B9-72674F5A6F7F}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">jsonArrayEncode</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXC30F54A4FA584A69AD3EA766B72EA7A7">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "len";
+	Aliases = {};
+	Description = "Returns the length of a comma-separated list";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "string";
+			Name = "CSV";
+			Description = "The comma-separated list"
+		}
+	};
+
+	Run = function(_, list)
+		return #(list:split(","))
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{FE7D8E60-EAA2-4A67-AAEC-4D502C743D27}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">len</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXDDE4CCF803AF4076AE07A6368A511989">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "math";
+	Aliases = {};
+	Description = "Perform a math operation on 2 values.";
+	Group = "DefaultUtil";
+	AutoExec = {
+		"alias \"+|Perform an addition.\" math + $1{number|Number} $2{number|Number}";
+		"alias \"-|Perform a subtraction.\" math - $1{number|Number} $2{number|Number}";
+		"alias \"*|Perform a multiplication.\" math * $1{number|Number} $2{number|Number}";
+		"alias \"/|Perform a division.\" math / $1{number|Number} $2{number|Number}";
+		"alias \"**|Perform an exponentiation.\" math ** $1{number|Number} $2{number|Number}";
+		"alias \"%|Perform a modulus.\" math % $1{number|Number} $2{number|Number}";
+	};
+	Args = {
+		{
+			Type = "mathOperator";
+			Name = "Operation";
+			Description = "A math operation."
+		};
+		{
+			Type = "number";
+			Name = "Value";
+			Description = "A number value."
+		};
+		{
+			Type = "number";
+			Name = "Value";
+			Description = "A number value."
+		}
+	};
+
+	ClientRun = function(_, operation, a, b)
+		return operation.Perform(a, b)
+	end
+}
+]]></ProtectedString>
+						<string name="ScriptGuid">{35DA6731-2D63-4066-A3FC-59E6E4B0C37C}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">math</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX84702C9911774C32B2E74C7839C920CF">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "pick";
+	Aliases = {};
+	Description = "Picks a value out of a comma-separated list.";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "integer";
+			Name = "Index to pick";
+			Description = "The index of the item you want to pick";
+		},
+		{
+			Type = "string";
+			Name = "CSV";
+			Description = "The comma-separated list"
+		}
+	};
+
+	Run = function(_, index, list)
+		return list:split(",")[index] or ""
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{335D6F0F-6BA5-41AF-AFA3-44E5A5AD6F65}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">pick</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX8EA574B1D1FC4A6DB900608D0AC9D0C2">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "rand";
+	Aliases = {};
+	Description = "Returns a random number between min and max";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "integer";
+			Name = "First number";
+			Description = "If second number is nil, random number is between 1 and this value. If second number is provided, number is between this number and the second number."
+		},
+		{
+			Type = "integer";
+			Name = "Second number";
+			Description = "The upper bound.";
+			Optional = true;
+		}
+	};
+
+	Run = function(_, min, max)
+		return tostring(max and math.random(min, max) or math.random(min))
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{13B75ADA-54B9-48F7-974B-D29BD7AB4F21}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">rand</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX7B2D947A085442C194D9BFAA7DACD64D">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "replace";
+	Aliases = {"gsub", "//"};
+	Description = "Replaces text A with text B";
+	Group = "DefaultUtil";
+	AutoExec = {
+		"alias \"map|Maps a CSV into another CSV\" replace $1{string|CSV} ([^,]+) \"$2{string|mapped value|Use %1 to insert the element}\"",
+		"alias \"join|Joins a CSV with a specified delimiter\" replace $1{string|CSV} , $2{string|Delimiter}"
+	},
+	Args = {
+		{
+			Type = "string";
+			Name = "Haystack";
+			Description = "The source string upon which to perform replacement."
+		},
+		{
+			Type = "string";
+			Name = "Needle";
+			Description = "The string pattern search for."
+		},
+		{
+			Type = "string";
+			Name = "Replacement";
+			Description = "The string to replace matches (%1 to insert matches).";
+			Default = "";
+		},
+	};
+
+	Run = function(_, haystack, needle, replacement)
+		return haystack:gsub(needle, replacement)
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{A795500C-13D9-4884-A6C6-67F6161E8F47}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">replace</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX395A8D8C9FC64A04A677A94D6BFA6912">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "resolve";
+	Aliases = {};
+	Description = "Resolves Argument Value Operators into lists. E.g., resolve players * gives you a list of all players.";
+	Group = "DefaultUtil";
+	AutoExec = {
+		"alias \"me|Displays your username\" resolve players ."
+	};
+	Args = {
+		{
+			Type = "type";
+			Name = "Type";
+			Description = "The type for which to resolve"
+		},
+		function (context)
+			if context:GetArgument(1):Validate() == false then
+				return
+			end
+
+			return {
+				Type = context:GetArgument(1):GetValue();
+				Name = "Argument Value Operator";
+				Description = "The value operator to resolve. One of: * ** . ? ?N";
+				Optional = true;
+			}
+		end
+	};
+
+	Run = function(context)
+		return table.concat(context:GetArgument(2).RawSegments, ",")
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{CDD41F81-126E-4BCE-A269-7E0AEDCF75F1}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">resolve</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX8070570AE6894336BDA25936F16BAC8C">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "run";
+	Aliases = {">"};
+	AutoExec = {
+		"alias \"discard|Run a command and discard the output.\" replace ${run $1} .* \\\"\\\""
+	};
+	Description = "Runs a given command string (replacing embedded commands).";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "string";
+			Name = "Command";
+			Description = "The command string to run"
+		},
+	};
+
+	Run = function(context, commandString)
+		return context.Cmdr.Util.RunCommandString(context.Dispatcher, commandString)
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{F6DB1C3E-0036-4AC5-8741-A1176157719A}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">run</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXF76D38C0218F476C9FA361D059880465">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "run-lines";
+	Aliases = {};
+	Description = "Splits input by newlines and runs each line as its own command. This is used by the init-run command.";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "string";
+			Name = "Script";
+			Description = "The script to parse.";
+			Default = "";
+		}
+	};
+
+	ClientRun = function(context, text)
+		if #text == 0 then
+			return ""
+		end
+
+		local shouldPrintOutput = context.Dispatcher:Run("var", "INIT_PRINT_OUTPUT") ~= ""
+
+		local commands = text:gsub("\n+", "\n"):split("\n")
+
+		for _, command in ipairs(commands) do
+			if command:sub(1, 1) == "#" then
+				continue
+			end
+
+			local output = context.Dispatcher:EvaluateAndRun(command)
+
+			if shouldPrintOutput then
+				context:Reply(output)
+			end
+		end
+
+		return ""
+	end
+}
+]]></ProtectedString>
+						<string name="ScriptGuid">{8448FFAA-E39F-4134-AA72-FC9134B146AF}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">runLines</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX86C3688C04BA49BC86B320FD89EA5F86">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local conditions = {
+	startsWith = function (text, arg)
+		if text:sub(1, #arg) == arg then
+			return text:sub(#arg + 1)
+		end
+	end
+}
+
+return {
+	Name = "runif";
+	Aliases = {};
+	Description = "Runs a given command string if a certain condition is met.";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "conditionFunction";
+			Name = "Condition";
+			Description = "The condition function"
+		},
+		{
+			Type = "string";
+			Name = "Argument";
+			Description = "The argument to the condition function"
+		},
+		{
+			Type = "string";
+			Name = "Test against";
+			Description = "The text to test against."
+		},
+		{
+			Type = "string";
+			Name = "Command";
+			Description = "The command string to run if requirements are met. If omitted, return value from condition function is used.";
+			Optional = true;
+		},
+	};
+
+	Run = function(context, condition, arg, testAgainst, command)
+		local conditionFunc = conditions[condition]
+
+		if not conditionFunc then
+			return ("Condition %q is not valid."):format(condition)
+		end
+
+		local text = conditionFunc(testAgainst, arg)
+
+		if text then
+			return context.Dispatcher:EvaluateAndRun(context.Cmdr.Util.RunEmbeddedCommands(context.Dispatcher, command or text))
+		end
+
+		return ""
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{C0B54B8E-2AA9-4380-A571-E34332734E40}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">runif</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX7EC9D02698734E14AC71FB5D22C7E2B7">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "unbind";
+	Aliases = {};
+	Description = "Unbinds an input previously bound with Bind";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "userInput ! bindableResource @ player";
+			Name = "Input/Key";
+			Description = "The key or input type you'd like to unbind."
+		}
+	};
+
+	ClientRun = function(context, inputEnum)
+		local binds = context:GetStore("CMDR_Binds")
+
+		if binds[inputEnum] then
+			binds[inputEnum]:Disconnect()
+			binds[inputEnum] = nil
+			return "Unbound command from input."
+		else
+			return "That input wasn't bound."
+		end
+	end
+}]]></ProtectedString>
+						<string name="ScriptGuid">{886B417B-3454-4343-8668-8E16E37FD4E0}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">unbind</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXB2299CB4856B4ECC82771B992E6A98E8">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "var";
+	Aliases = {};
+	Description = "Gets a stored variable.";
+	Group = "DefaultUtil";
+	AutoExec = {
+		"alias \"init-edit|Edit your initialization script\" edit ${var init} \\\\\n && var= init ||",
+		"alias \"init-run|Re-runs the initialization script manually.\" run-lines ${var init}",
+		"init-run",
+	},
+	Args = {
+		{
+			Type = "storedKey";
+			Name = "Key";
+			Description = "The key to get, retrieved from your user data store. Keys prefixed with . are not saved. Keys prefixed with $ are game-wide. Keys prefixed with $. are game-wide and non-saved.";
+		}
+	};
+
+	ClientRun = function(context, key)
+		context:GetStore("vars_used")[key] = true
+	end
+}
+]]></ProtectedString>
+						<string name="ScriptGuid">{4A4BEA40-2FCE-4007-8380-3B94DBCB35C7}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">var</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX9FD102C30A17498AAF11E15D46B5C358">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local DataStoreService = game:GetService("DataStoreService")
+
+local queue = {}
+local DataStoresActive, DataStore
+task.spawn(function()
+	DataStoresActive, DataStore = pcall(function()
+		local DataStore = DataStoreService:GetDataStore("_package/eryn.io/Cmdr")
+		DataStore:GetAsync("test_key")
+		return DataStore
+	end)
+
+	while #queue > 0 do
+		coroutine.resume(table.remove(queue, 1))
+	end
+end)
+
+return function (context, key)
+	if DataStoresActive == nil then
+		table.insert(queue, coroutine.running())
+		coroutine.yield()
+	end
+
+	local gameWide = false
+	local saved = true
+
+	if key:sub(1, 1) == "$" then
+		key = key:sub(2)
+		gameWide = true
+	end
+
+	if key:sub(1, 1) == "." then
+		key = key:sub(2)
+		saved = false
+	end
+
+	if saved and not DataStoresActive then
+		return "# You must publish this place to the web to use saved keys."
+	end
+
+	local namespace = "var_" .. (gameWide and "global" or tostring(context.Executor.UserId))
+
+	if saved then
+		local keyPath = namespace .. "_" .. key
+		local value = DataStore:GetAsync(keyPath) or ""
+		if type(value) == "table" then
+			return table.concat(value, ",") or ""
+		end
+		return value
+	else
+		local store = context:GetStore(namespace)
+
+		local value = store[key] or ""
+
+		if type(value) == "table" then
+			return table.concat(value, ",") or ""
+		end
+
+		return value
+	end
+end
+]]></ProtectedString>
+						<string name="ScriptGuid">{8B158197-1500-4B2A-91AA-B7C8C4342ABF}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">varServer</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXF8335AD97BB943B8BC76DEB1886D867E">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[return {
+	Name = "var=";
+	Aliases = {};
+	Description = "Sets a stored value.";
+	Group = "DefaultUtil";
+	Args = {
+		{
+			Type = "storedKey";
+			Name = "Key";
+			Description = "The key to set, saved in your user data store. Keys prefixed with . are not saved. Keys prefixed with $ are game-wide. Keys prefixed with $. are game-wide and non-saved.";
+		},
+		{
+			Type = "string";
+			Name = "Value";
+			Description = "Value or values to set.";
+			Default = "";
+		}
+	};
+
+	ClientRun = function(context, key)
+		context:GetStore("vars_used")[key] = true
+	end
+}
+]]></ProtectedString>
+						<string name="ScriptGuid">{245616B6-C70F-4507-9E82-9EE291D8CB6C}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">varSet</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX7E0F3014D0C14EC1A2BC39319BEF75D9">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[local DataStoreService = game:GetService("DataStoreService")
+
+local queue = {}
+local DataStoresActive, DataStore
+task.spawn(function()
+	DataStoresActive, DataStore = pcall(function()
+		local DataStore = DataStoreService:GetDataStore("_package/eryn.io/Cmdr")
+		DataStore:GetAsync("test_key")
+		return DataStore
+	end)
+
+	while #queue > 0 do
+		coroutine.resume(table.remove(queue, 1))
+	end
+end)
+
+return function (context, key, value)
+	if DataStoresActive == nil then
+		table.insert(queue, coroutine.running())
+		coroutine.yield()
+	end
+
+	local gameWide = false
+	local saved = true
+
+	if key:sub(1, 1) == "$" then
+		key = key:sub(2)
+		gameWide = true
+	end
+
+	if key:sub(1, 1) == "." then
+		key = key:sub(2)
+		saved = false
+	end
+
+	if saved and not DataStoresActive then
+		return "# You must publish this place to the web to use saved keys."
+	end
+
+	local namespace = "var_" .. (gameWide and "global" or tostring(context.Executor.UserId))
+
+	if saved then
+		local keyPath = namespace .. "_" .. key
+
+		DataStore:SetAsync(keyPath, value)
+
+		if type(value) == "table" then
+			return table.concat(value, ",") or ""
+		end
+
+		return value
+	else
+		local store = context:GetStore(namespace)
+
+		store[key] = value
+
+		if type(value) == "table" then
+			return table.concat(value, ",") or ""
+		end
+
+		return value
+	end
+end
+]]></ProtectedString>
+						<string name="ScriptGuid">{F3049D0A-43FA-4E61-8A1A-2C1919125EE3}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">varSetServer</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+			</Item>
+			<Item class="ModuleScript" referent="RBXEE4DA06CCA2C445A8E08DE8796B6344D">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local ARGUMENT_SHORTHANDS = [[
+Argument Shorthands
+-------------------
+.   Me/Self
+*   All/Everyone
+**  Others
+?   Random
+?N  List of N random values
+]]
+
+local TIPS = [[
+Tips
+----
+• Utilize the Tab key to automatically complete commands
+• Easily select and copy command output
+]]
+
+return {
+	Name = "help";
+	Description = "Displays a list of all commands, or inspects one command.";
+	Group = "Help";
+	Args = {
+		{
+			Type = "command";
+			Name = "Command";
+			Description = "The command to view information on";
+			Optional = true;
+		},
+	};
+
+	ClientRun = function (context, commandName)
+		if commandName then
+			local command = context.Cmdr.Registry:GetCommand(commandName)
+			context:Reply(`Command: {command.Name}`, Color3.fromRGB(230, 126, 34))
+			if command.Aliases and #command.Aliases > 0 then
+				context:Reply(`Aliases: {table.concat(command.Aliases, ", ")}`, Color3.fromRGB(230, 230, 230))
+			end
+			context:Reply(command.Description, Color3.fromRGB(230, 230, 230))
+			for i, arg in ipairs(command.Args) do
+				context:Reply(
+					`#{i} {arg.Name}{if arg.Optional == true then "?" else ""}: {arg.Type} - {arg.Description}`
+				)
+			end
+		else
+			context:Reply(ARGUMENT_SHORTHANDS)
+			context:Reply(TIPS)
+
+			local commands = context.Cmdr.Registry:GetCommands()
+			table.sort(commands, function(a, b)
+				return if a.Group and b.Group then a.Group < b.Group else a.Group
+			end)
+			local lastGroup
+			for _, command in ipairs(commands) do
+				command.Group = command.Group or "No Group"
+				if lastGroup ~= command.Group then
+					context:Reply(`\n{command.Group}\n{string.rep("-", #command.Group)}`)
+					lastGroup = command.Group
+				end
+				context:Reply(if command.Description then `{command.Name} - {command.Description}` else command.Name)
+			end
+		end
+		return ""
+	end;
+}
+]]></ProtectedString>
+					<string name="ScriptGuid">{83D4D739-DB31-46CE-801F-6DE91A79832A}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">help</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+		</Item>
+		<Item class="Folder" referent="RBX357E04E54F944EFC87E6D77ED3F0A93A">
+			<Properties>
+				<BinaryString name="AttributesSerialize"></BinaryString>
+				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+				<bool name="DefinesCapabilities">false</bool>
+				<string name="Name">BuiltInTypes</string>
+				<int64 name="SourceAssetId">-1</int64>
+				<BinaryString name="Tags"></BinaryString>
+			</Properties>
+			<Item class="ModuleScript" referent="RBX7238B7A3C8474C82B2D5E68D975F0E38">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[return function (registry)
+	registry:RegisterType("bindableResource", registry.Cmdr.Util.MakeEnumType("BindableResource", {"Chat"}))
+end
+]]></ProtectedString>
+					<string name="ScriptGuid">{770D4D71-1F29-4DF2-8A49-684E4064FDED}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">BindableResource</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX59582D9DC8964790885B585CE4ABA4AB">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Util = require(script.Parent.Parent.Shared.Util)
+
+local brickColorNames = {
+    "White", "Grey", "Light yellow", "Brick yellow", "Light green (Mint)", "Light reddish violet", "Pastel Blue",
+    "Light orange brown", "Nougat", "Bright red", "Med. reddish violet", "Bright blue", "Bright yellow", "Earth orange",
+    "Black", "Dark grey", "Dark green", "Medium green", "Lig. Yellowich orange", "Bright green", "Dark orange",
+    "Light bluish violet", "Transparent", "Tr. Red", "Tr. Lg blue", "Tr. Blue", "Tr. Yellow", "Light blue",
+    "Tr. Flu. Reddish orange", "Tr. Green", "Tr. Flu. Green", "Phosph. White", "Light red", "Medium red", "Medium blue",
+    "Light grey", "Bright violet", "Br. yellowish orange", "Bright orange", "Bright bluish green", "Earth yellow",
+    "Bright bluish violet", "Tr. Brown", "Medium bluish violet", "Tr. Medi. reddish violet", "Med. yellowish green",
+    "Med. bluish green", "Light bluish green", "Br. yellowish green", "Lig. yellowish green", "Med. yellowish orange",
+    "Br. reddish orange", "Bright reddish violet", "Light orange", "Tr. Bright bluish violet", "Gold", "Dark nougat",
+    "Silver", "Neon orange", "Neon green", "Sand blue", "Sand violet", "Medium orange", "Sand yellow", "Earth blue",
+    "Earth green", "Tr. Flu. Blue", "Sand blue metallic", "Sand violet metallic", "Sand yellow metallic",
+    "Dark grey metallic", "Black metallic", "Light grey metallic", "Sand green", "Sand red", "Dark red",
+    "Tr. Flu. Yellow", "Tr. Flu. Red", "Gun metallic", "Red flip/flop", "Yellow flip/flop", "Silver flip/flop", "Curry",
+    "Fire Yellow", "Flame yellowish orange", "Reddish brown", "Flame reddish orange", "Medium stone grey", "Royal blue",
+    "Dark Royal blue", "Bright reddish lilac", "Dark stone grey", "Lemon metalic", "Light stone grey", "Dark Curry",
+    "Faded green", "Turquoise", "Light Royal blue", "Medium Royal blue", "Rust", "Brown", "Reddish lilac", "Lilac",
+    "Light lilac", "Bright purple", "Light purple", "Light pink", "Light brick yellow", "Warm yellowish orange",
+    "Cool yellow", "Dove blue", "Medium lilac", "Slime green", "Smoky grey", "Dark blue", "Parsley green", "Steel blue",
+    "Storm blue", "Lapis", "Dark indigo", "Sea green", "Shamrock", "Fossil", "Mulberry", "Forest green", "Cadet blue",
+    "Electric blue", "Eggplant", "Moss", "Artichoke", "Sage green", "Ghost grey", "Lilac", "Plum", "Olivine",
+    "Laurel green", "Quill grey", "Crimson", "Mint", "Baby blue", "Carnation pink", "Persimmon", "Maroon", "Gold",
+    "Daisy orange", "Pearl", "Fog", "Salmon", "Terra Cotta", "Cocoa", "Wheat", "Buttermilk", "Mauve", "Sunrise",
+    "Tawny", "Rust", "Cashmere", "Khaki", "Lily white", "Seashell", "Burgundy", "Cork", "Burlap", "Beige", "Oyster",
+    "Pine Cone", "Fawn brown", "Hurricane grey", "Cloudy grey", "Linen", "Copper", "Dirt brown", "Bronze", "Flint",
+    "Dark taupe", "Burnt Sienna", "Institutional white", "Mid gray", "Really black", "Really red", "Deep orange",
+    "Alder", "Dusty Rose", "Olive", "New Yeller", "Really blue", "Navy blue", "Deep blue", "Cyan", "CGA brown",
+    "Magenta", "Pink", "Deep orange", "Teal", "Toothpaste", "Lime green", "Camo", "Grime", "Lavender",
+    "Pastel light blue", "Pastel orange", "Pastel violet", "Pastel blue-green", "Pastel green", "Pastel yellow",
+    "Pastel brown", "Royal purple", "Hot pink"
+}
+
+local brickColorFinder = Util.MakeFuzzyFinder(brickColorNames)
+
+local brickColorType =  {
+	Prefixes = "% teamColor";
+
+    Transform = function(text)
+        local brickColors = {}
+        for i, name in pairs(brickColorFinder(text)) do
+            brickColors[i] = BrickColor.new(name)
+        end
+        return brickColors
+    end;
+
+    Validate = function(brickColors)
+        return #brickColors > 0, "No valid brick colors with that name could be found."
+    end;
+
+    Autocomplete = function(brickColors)
+        return Util.GetNames(brickColors)
+    end;
+
+    Parse = function(brickColors)
+        return brickColors[1]
+    end;
+}
+
+local brickColor3Type = {
+	Transform = brickColorType.Transform;
+	Validate = brickColorType.Validate;
+	Autocomplete = brickColorType.Autocomplete;
+
+	Parse = function(brickColors)
+		return brickColors[1].Color
+	end;
+}
+
+return function(registry)
+    registry:RegisterType("brickColor", brickColorType)
+	registry:RegisterType("brickColors", Util.MakeListableType(brickColorType, {
+		Prefixes = "% teamColors"
+	}))
+
+	registry:RegisterType("brickColor3", brickColor3Type)
+    registry:RegisterType("brickColor3s", Util.MakeListableType(brickColor3Type))
+end]]></ProtectedString>
+					<string name="ScriptGuid">{5F752C38-7B3B-43FC-B17E-0D29A94B29DE}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">BrickColor</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBXAF007FC001DD4699AD2438B673A42ED2">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Util = require(script.Parent.Parent.Shared.Util)
+
+local color3Type = Util.MakeSequenceType({
+	Prefixes = "# hexColor3 ! brickColor3";
+	ValidateEach = function(value, i)
+		if value == nil then
+			return false, ("Invalid or missing number at position %d in Color3 type."):format(i)
+		elseif value < 0 or value > 255 then
+			return false, ("Number out of acceptable range 0-255 at position %d in Color3 type."):format(i)
+		elseif value % 1 ~= 0 then
+			return false, ("Number is not an integer at position %d in Color3 type."):format(i)
+		end
+
+		return true
+	end;
+	TransformEach = tonumber;
+	Constructor = Color3.fromRGB;
+	Length = 3;
+})
+
+local function parseHexDigit(x)
+	if #x == 1 then
+		x = x .. x
+	end
+
+	return tonumber(x, 16)
+end
+
+local hexColor3Type = {
+	Transform = function(text)
+		local r, g, b = text:match("^#?(%x%x?)(%x%x?)(%x%x?)$")
+		return Util.Each(parseHexDigit, r, g, b)
+	end;
+
+	Validate = function(r, g, b)
+		return r ~= nil and g ~= nil and b ~= nil, "Invalid hex color"
+	end;
+
+	Parse = function(...)
+		return Color3.fromRGB(...)
+	end;
+}
+
+return function (cmdr)
+	cmdr:RegisterType("color3", color3Type)
+	cmdr:RegisterType("color3s", Util.MakeListableType(color3Type, {
+		Prefixes = "# hexColor3s ! brickColor3s"
+	}))
+
+	cmdr:RegisterType("hexColor3", hexColor3Type)
+	cmdr:RegisterType("hexColor3s", Util.MakeListableType(hexColor3Type))
+end
+]]></ProtectedString>
+					<string name="ScriptGuid">{CADD90FF-C654-4A9F-A6AF-DAE648F3A00F}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Color3</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX1329D19EC6914D4FBB0B08D0B70718A7">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Util = require(script.Parent.Parent.Shared.Util)
+
+return function (cmdr)
+	local commandType = {
+		Transform = function (text)
+			local findCommand = Util.MakeFuzzyFinder(cmdr:GetCommandNames())
+
+			return findCommand(text)
+		end;
+
+		Validate = function (commands)
+			return #commands > 0, "No command with that name could be found."
+		end;
+
+		Autocomplete = function (commands)
+			return commands
+		end;
+
+		Parse = function (commands)
+			return commands[1]
+		end;
+	}
+
+	cmdr:RegisterType("command", commandType)
+	cmdr:RegisterType("commands", Util.MakeListableType(commandType))
+end]]></ProtectedString>
+					<string name="ScriptGuid">{1B81DDBE-0434-41E9-B8E2-8C3A14815B4A}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Command</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX7474BB95D15E4D1CB2219B12A68B9183">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[return function (registry)
+	registry:RegisterType("conditionFunction", registry.Cmdr.Util.MakeEnumType("ConditionFunction", {"startsWith"}))
+end
+]]></ProtectedString>
+					<string name="ScriptGuid">{27C0CFEC-FCEA-4E0D-B949-F6E233AE8A81}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">ConditionFunction</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX3181FFF3C90B47D5A1D0DD27C47A8430">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Util = require(script.Parent.Parent.Shared.Util)
+
+local unitTable = {
+    Years = 31556926,
+    Months = 2629744,
+    Weeks = 604800,
+    Days = 86400,
+    Hours = 3600,
+    Minutes = 60,
+    Seconds = 1
+}
+
+local searchKeyTable = {}
+for key, _ in pairs(unitTable) do
+    table.insert(searchKeyTable, key)
+end
+local unitFinder = Util.MakeFuzzyFinder(searchKeyTable)
+
+local function stringToSecondDuration(stringDuration)
+    -- The duration cannot be null or an empty string.
+    if stringDuration == nil or stringDuration == "" then
+        return nil
+    end
+    -- Allow 0 by itself (without a unit) to indicate 0 seconds
+    local durationNum = tonumber(stringDuration)
+    if durationNum and durationNum == 0 then
+        return 0, 0, true
+    end
+    -- The duration must end with a unit,
+    -- if it doesn't then return true as the fourth value to indicate the need to offer autocomplete for units.
+    local endOnlyString = stringDuration:gsub("-?%d+%a+", "")
+    local endNumber = endOnlyString:match("-?%d+")
+    if endNumber then
+        return nil, tonumber(endNumber), true
+    end
+    local seconds = nil
+    local rawNum, rawUnit
+    for rawComponent in stringDuration:gmatch("-?%d+%a+") do
+        rawNum, rawUnit = rawComponent:match("(-?%d+)(%a+)")
+        local unitNames = unitFinder(rawUnit)
+        -- There were no matching units, it's invalid. Return the parsed number to be used for autocomplete
+        if #unitNames == 0 then
+            return nil, tonumber(rawNum)
+        end
+        if seconds == nil then seconds = 0 end
+        -- While it was already defaulting to use minutes when using just "m", this does it without worrying
+        -- about any consistency between list ordering.
+        seconds = seconds + (rawUnit:lower() == "m" and 60 or unitTable[unitNames[1]]) * tonumber(rawNum)
+    end
+    -- If no durations were provided, return nil.
+    if seconds == nil then
+        return nil
+    else
+        return seconds, tonumber(rawNum)
+    end
+end
+
+local function mapUnits(units, rawText, lastNumber, subStart)
+    subStart = subStart or 1
+    local returnTable = {}
+    for i, unit in pairs(units) do
+        if lastNumber == 1 then
+            returnTable[i] = rawText .. unit:sub(subStart, #unit - 1)
+        else
+            returnTable[i] = rawText .. unit:sub(subStart)
+        end
+    end
+    return returnTable
+end
+
+local durationType = {
+    Transform = function(text)
+        return text, stringToSecondDuration(text)
+    end;
+
+    Validate = function(_, duration)
+        return duration ~= nil
+    end;
+
+    Autocomplete = function(rawText, duration, lastNumber, isUnitMissing, matchedUnits)
+        local returnTable = {}
+        if isUnitMissing or matchedUnits then
+            local unitsTable = isUnitMissing == true and unitFinder("") or matchedUnits
+            if isUnitMissing == true then
+                -- Concat the entire unit name to existing text.
+                returnTable = mapUnits(unitsTable, rawText, lastNumber)
+            else
+                -- Concat the rest of the unit based on what already exists of the unit name.
+                local existingUnitLength = rawText:match("^.*(%a+)$"):len()
+                returnTable = mapUnits(unitsTable, rawText, existingUnitLength + 1)
+            end
+        elseif duration ~= nil then
+            local endingUnit = rawText:match("^.*-?%d+(%a+)%s?$")
+            -- Assume there is a singular match at this point
+            local fuzzyUnits = unitFinder(endingUnit)
+            -- List all possible fuzzy matches. This is for the Minutes/Months ambiguity case.
+            returnTable = mapUnits(fuzzyUnits, rawText, lastNumber, #endingUnit + 1)
+            -- Sort alphabetically in the Minutes/Months case, so Minutes are displayed on top.
+            table.sort(returnTable)
+        end
+        return returnTable
+    end;
+
+    Parse = function(_, duration)
+        return duration
+    end;
+}
+
+return function(registry)
+    registry:RegisterType("duration", durationType)
+    registry:RegisterType("durations", Util.MakeListableType(durationType))
+end
+]]></ProtectedString>
+					<string name="ScriptGuid">{E4A8DC6F-84AE-4F00-90CB-2B853B5AC69C}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Duration</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBXBE68C1702A8849EAB76421563E9AEFFF">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local HttpService = game:GetService("HttpService")
+
+return function(registry)
+	registry:RegisterType("json", {
+		Validate = function(text)
+			return pcall(HttpService.JSONDecode, HttpService, text)
+		end;
+
+		Parse = function(text)
+			return HttpService:JSONDecode(text)
+		end
+	})
+end
+]]></ProtectedString>
+					<string name="ScriptGuid">{68CAF76B-2135-4BDE-AE7B-F8513310AAAD}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">JSON</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBXD02EBA02C66A4BF29783E6ADB0BF6C72">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[return function(registry)
+	registry:RegisterType("mathOperator", registry.Cmdr.Util.MakeEnumType("Math Operator", {
+		{
+			Name = "+";
+			Perform = function(a, b)
+				return a + b
+			end
+		};
+		{
+			Name = "-";
+			Perform = function(a, b)
+				return a - b
+			end
+		};
+		{
+			Name = "*";
+			Perform = function(a, b)
+				return a * b
+			end
+		};
+		{
+			Name = "/";
+			Perform = function(a, b)
+				return a / b
+			end
+		};
+		{
+			Name = "**";
+			Perform = function(a, b)
+				return a ^ b
+			end
+		};
+		{
+			Name = "%";
+			Perform = function(a, b)
+				return a % b
+			end
+		}
+	}))
+end
+]]></ProtectedString>
+					<string name="ScriptGuid">{CD4CA200-A61B-4B60-80DC-66C948A5A8C9}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">MathOperator</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBXEA401D4EF882468BA731766E51EF27C2">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Util = require(script.Parent.Parent.Shared.Util)
+local Players = game:GetService("Players")
+
+local playerType = {
+	Transform = function (text)
+		local findPlayer = Util.MakeFuzzyFinder(Players:GetPlayers())
+
+		return findPlayer(text)
+	end;
+
+	Validate = function (players)
+		return #players > 0, "No player with that name could be found."
+	end;
+
+	Autocomplete = function (players)
+		return Util.GetNames(players)
+	end;
+
+	Parse = function (players)
+		return players[1]
+	end;
+
+	Default = function(player)
+		return player.Name
+	end;
+
+	ArgumentOperatorAliases = {
+		me = ".";
+		all = "*";
+		others = "**";
+		random = "?";
+	};
+}
+
+return function (cmdr)
+	cmdr:RegisterType("player", playerType)
+	cmdr:RegisterType("players", Util.MakeListableType(playerType, {
+		Prefixes = "% teamPlayers";
+	}))
+end
+]]></ProtectedString>
+					<string name="ScriptGuid">{56B43162-EAA8-4D43-B227-57E399B16D34}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Player</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX1FE9B48755EC43D8BC46A821882B5415">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Util = require(script.Parent.Parent.Shared.Util)
+local Players = game:GetService("Players")
+
+local nameCache = {}
+local function getUserId(name)
+	if nameCache[name] then
+		return nameCache[name]
+	elseif Players:FindFirstChild(name) then
+		nameCache[name] = Players[name].UserId
+		return Players[name].UserId
+	else
+		local ok, userid = pcall(Players.GetUserIdFromNameAsync, Players, name)
+
+		if not ok then
+			return nil
+		end
+
+		nameCache[name] = userid
+		return userid
+	end
+end
+
+local playerIdType = {
+	DisplayName = "Full Player Name";
+	Prefixes = "# integer";
+
+	Transform = function (text)
+		local findPlayer = Util.MakeFuzzyFinder(Players:GetPlayers())
+
+		return text, findPlayer(text)
+	end;
+
+	ValidateOnce = function (text)
+		return getUserId(text) ~= nil, "No player with that name could be found."
+	end;
+
+	Autocomplete = function (_, players)
+		return Util.GetNames(players)
+	end;
+
+	Parse = function (text)
+		return getUserId(text)
+	end;
+
+	Default = function(player)
+		return player.Name
+	end;
+
+	ArgumentOperatorAliases = {
+		me = ".";
+		all = "*";
+		others = "**";
+		random = "?";
+	};
+}
+
+return function (cmdr)
+	cmdr:RegisterType("playerId", playerIdType)
+	cmdr:RegisterType("playerIds", Util.MakeListableType(playerIdType, {
+		Prefixes = "# integers"
+	}))
+end
+]]></ProtectedString>
+					<string name="ScriptGuid">{1A3D608F-7EB5-49D2-AC87-63678D12179B}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">PlayerId</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBXE2C5E02D639141819A28A4B7DCFEF223">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Util = require(script.Parent.Parent.Shared.Util)
+
+local stringType = {
+	Validate = function (value)
+		return value ~= nil
+	end;
+
+	Parse = function (value)
+		return tostring(value)
+	end;
+}
+
+local numberType = {
+	Transform = function (text)
+		return tonumber(text)
+	end;
+
+	Validate = function (value)
+		return value ~= nil
+	end;
+
+	Parse = function (value)
+		return value
+	end;
+}
+
+local intType = {
+	Transform = function (text)
+		return tonumber(text)
+	end;
+
+	Validate = function (value)
+		return value ~= nil and value == math.floor(value), "Only whole numbers are valid."
+	end;
+
+	Parse = function (value)
+		return value
+	end
+}
+
+local positiveIntType = {
+	Transform = function (text)
+		return tonumber(text)
+	end,
+
+	Validate = function (value)
+		return value ~= nil and value == math.floor(value) and value > 0, "Only positive whole numbers are valid."
+	end,
+
+	Parse = function (value)
+		return value
+	end,
+}
+
+local nonNegativeIntType = {
+	Transform = function (text)
+		return tonumber(text)
+	end,
+
+	Validate = function (value)
+		return value ~= nil and value == math.floor(value) and value >= 0, "Only non-negative whole numbers are valid."
+	end,
+
+	Parse = function (value)
+		return value
+	end,
+}
+
+local byteType = {
+	Transform = function (text)
+		return tonumber(text)
+	end,
+
+	Validate = function (value)
+		return value ~= nil and value == math.floor(value) and value >= 0 and value <= 255, "Only bytes are valid."
+	end,
+
+	Parse = function (value)
+		return value
+	end,
+}
+
+local digitType = {
+	Transform = function (text)
+		return tonumber(text)
+	end,
+
+	Validate = function (value)
+		return value ~= nil and value == math.floor(value) and value >= 0 and value <= 9, "Only digits are valid."
+	end,
+
+	Parse = function (value)
+		return value
+	end,
+}
+
+local boolType do
+	local truthy = Util.MakeDictionary({"true", "t", "yes", "y", "on", "enable", "enabled", "1", "+"});
+	local falsy = Util.MakeDictionary({"false"; "f"; "no"; "n"; "off"; "disable"; "disabled"; "0"; "-"});
+
+	boolType = {
+		Transform = function (text)
+			return text:lower()
+		end;
+
+		Validate = function (value)
+			return truthy[value] ~= nil or falsy[value] ~= nil, "Please use true/yes/on or false/no/off."
+		end;
+
+		Parse = function (value)
+			if truthy[value] then
+				return true
+			elseif falsy[value] then
+				return false
+			else
+				return nil
+			end
+		end;
+	}
+end
+
+return function (cmdr)
+	cmdr:RegisterType("string", stringType)
+	cmdr:RegisterType("number", numberType)
+	cmdr:RegisterType("integer", intType)
+	cmdr:RegisterType("positiveInteger", positiveIntType)
+	cmdr:RegisterType("nonNegativeInteger", nonNegativeIntType)
+	cmdr:RegisterType("byte", byteType)
+	cmdr:RegisterType("digit", digitType)
+	cmdr:RegisterType("boolean", boolType)
+
+	cmdr:RegisterType("strings", Util.MakeListableType(stringType))
+	cmdr:RegisterType("numbers", Util.MakeListableType(numberType))
+	cmdr:RegisterType("integers", Util.MakeListableType(intType))
+	cmdr:RegisterType("positiveIntegers", Util.MakeListableType(positiveIntType))
+	cmdr:RegisterType("nonNegativeIntegers", Util.MakeListableType(nonNegativeIntType))
+	cmdr:RegisterType("bytes", Util.MakeListableType(byteType))
+	cmdr:RegisterType("digits", Util.MakeListableType(digitType))
+	cmdr:RegisterType("booleans", Util.MakeListableType(boolType))
+end
+]]></ProtectedString>
+					<string name="ScriptGuid">{66D6FA04-814C-423A-920C-4D3DD612D2CE}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Primitives</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX054B6CD9A0354AF292F279DEE3E27219">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Util = require(script.Parent.Parent.Shared.Util)
+
+local VALID_STORED_KEY_NAME_PATTERNS = {
+	"^%a[%w_]*$",
+	"^%$%a[%w_]*$",
+	"^%.%a[%w_]*$",
+	"^%$%.%a[%w_]*$",
+}
+
+return function (registry)
+	local storedKeyType = {
+		Autocomplete = function(text)
+			local find = registry.Cmdr.Util.MakeFuzzyFinder(registry.Cmdr.Util.DictionaryKeys(registry:GetStore("vars_used") or {}))
+
+			return find(text)
+		end;
+
+		Validate = function(text)
+			for _, pattern in ipairs(VALID_STORED_KEY_NAME_PATTERNS) do
+				if text:match(pattern) then
+					return true
+				end
+			end
+
+			return false, "Key names must start with an optional modifier: . $ or $. and must begin with a letter."
+		end;
+
+		Parse = function(text)
+			return text
+		end;
+	}
+	registry:RegisterType("storedKey", storedKeyType)
+	registry:RegisterType("storedKeys", Util.MakeListableType(storedKeyType))
+end
+]]></ProtectedString>
+					<string name="ScriptGuid">{EF4AEF1E-C77B-4473-AA57-F08A86EB7845}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">StoredKey</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBXB803022B4DDA4ACBAFE812F08BEB3151">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Teams = game:GetService("Teams")
+local Util = require(script.Parent.Parent.Shared.Util)
+
+local teamType = {
+	Transform = function (text)
+		local findTeam = Util.MakeFuzzyFinder(Teams:GetTeams())
+
+		return findTeam(text)
+	end;
+
+	Validate = function (teams)
+		return #teams > 0, "No team with that name could be found."
+	end;
+
+	Autocomplete = function (teams)
+		return Util.GetNames(teams)
+	end;
+
+	Parse = function (teams)
+		return teams[1];
+	end;
+}
+
+local teamPlayersType = {
+	Listable = true;
+	Transform = teamType.Transform;
+	Validate = teamType.Validate;
+	Autocomplete = teamType.Autocomplete;
+
+	Parse = function (teams)
+		return teams[1]:GetPlayers()
+	end;
+}
+
+local teamColorType = {
+	Transform = teamType.Transform;
+	Validate = teamType.Validate;
+	Autocomplete = teamType.Autocomplete;
+
+	Parse = function (teams)
+		return teams[1].TeamColor
+	end;
+}
+
+return function (cmdr)
+	cmdr:RegisterType("team", teamType)
+	cmdr:RegisterType("teams", Util.MakeListableType(teamType))
+
+	cmdr:RegisterType("teamPlayers", teamPlayersType)
+
+	cmdr:RegisterType("teamColor", teamColorType)
+	cmdr:RegisterType("teamColors", Util.MakeListableType(teamColorType))
+end]]></ProtectedString>
+					<string name="ScriptGuid">{4A51144A-FAF0-4C0A-A7CF-853384FD4152}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Team</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX1195082AFA8A4783AE0912488CCCE5FD">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Util = require(script.Parent.Parent.Shared.Util)
+
+return function (cmdr)
+	local typeType = {
+		Transform = function (text)
+			local findCommand = Util.MakeFuzzyFinder(cmdr:GetTypeNames())
+
+			return findCommand(text)
+		end;
+
+		Validate = function (commands)
+			return #commands > 0, "No type with that name could be found."
+		end;
+
+		Autocomplete = function (commands)
+			return commands
+		end;
+
+		Parse = function (commands)
+			return commands[1]
+		end;
+	}
+
+	cmdr:RegisterType("type", typeType)
+	cmdr:RegisterType("types", Util.MakeListableType(typeType))
+end]]></ProtectedString>
+					<string name="ScriptGuid">{014BDAD9-54C5-467D-9079-5761C1766BCE}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Type</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBXB4D1BBAF668F43EA8CD222A80D54D08E">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Util = require(script.Parent.Parent.Shared.Util)
+
+local storedKeyType = {
+	Validate = function(text)
+		if text:match("^https?://.+$") then
+			return true
+		end
+
+		return false, "URLs must begin with http:// or https://"
+	end;
+
+	Parse = function(text)
+		return text
+	end;
+}
+
+return function (cmdr)
+	cmdr:RegisterType("url", storedKeyType)
+	cmdr:RegisterType("urls", Util.MakeListableType(storedKeyType))
+end
+]]></ProtectedString>
+					<string name="ScriptGuid">{2E304BD9-B036-4339-A8EB-6477A4D26C9A}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">URL</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBXE92B849D7EA2455CBE644BC14D8F8600">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Util = require(script.Parent.Parent.Shared.Util)
+
+local combinedInputEnums = Enum.UserInputType:GetEnumItems()
+
+for _, e in pairs(Enum.KeyCode:GetEnumItems()) do
+	combinedInputEnums[#combinedInputEnums + 1] = e
+end
+
+local userInputType = {
+	Transform = function (text)
+		local findEnum = Util.MakeFuzzyFinder(combinedInputEnums)
+
+		return findEnum(text)
+	end;
+
+	Validate = function (enums)
+		return #enums > 0
+	end;
+
+	Autocomplete = function (enums)
+		return Util.GetNames(enums)
+	end;
+
+	Parse = function (enums)
+		return enums[1];
+	end;
+}
+
+return function (cmdr)
+	cmdr:RegisterType("userInput", userInputType)
+	cmdr:RegisterType("userInputs", Util.MakeListableType(userInputType))
+end]]></ProtectedString>
+					<string name="ScriptGuid">{E59B1181-2EF2-4F1F-981B-A9396B87B949}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">UserInput</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBXF3FFADBAFFB44AC684C5D74ECB0BE5EA">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Util = require(script.Parent.Parent.Shared.Util)
+
+local function validateVector(value, i)
+	if value == nil then
+		return false, ("Invalid or missing number at position %d in Vector type."):format(i)
+	end
+
+	return true
+end
+
+local vector3Type = Util.MakeSequenceType({
+	ValidateEach = validateVector;
+	TransformEach = tonumber;
+	Constructor = Vector3.new;
+	Length = 3;
+})
+
+local vector2Type = Util.MakeSequenceType({
+	ValidateEach = validateVector;
+	TransformEach = tonumber;
+	Constructor = Vector2.new;
+	Length = 2;
+})
+
+return function (cmdr)
+	cmdr:RegisterType("vector3", vector3Type)
+	cmdr:RegisterType("vector3s", Util.MakeListableType(vector3Type))
+
+	cmdr:RegisterType("vector2", vector2Type)
+	cmdr:RegisterType("vector2s", Util.MakeListableType(vector2Type))
+end]]></ProtectedString>
+					<string name="ScriptGuid">{96FF004F-4FF0-4902-96C7-D1A469EAABE4}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Vector</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+		</Item>
+		<Item class="ModuleScript" referent="RBXAFCD786E73E1434CB541D321716F4F8D">
+			<Properties>
+				<Content name="LinkedSource"><null></null></Content>
+				<ProtectedString name="Source"><![CDATA[local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local Shared = script:WaitForChild("Shared")
+local Util = require(Shared:WaitForChild("Util"))
+
+if RunService:IsClient() == false then
+	error("Server scripts cannot require the client library. Please require the server library to use Cmdr in your own code.")
+end
+
+local Cmdr do
+	Cmdr = setmetatable({
+		ReplicatedRoot = script;
+		RemoteFunction = script:WaitForChild("CmdrFunction");
+		RemoteEvent = script:WaitForChild("CmdrEvent");
+		ActivationKeys = {[Enum.KeyCode.F2] = true};
+		Enabled = true;
+		MashToEnable = false;
+		ActivationUnlocksMouse = false;
+		HideOnLostFocus = true;
+		PlaceName = "Cmdr";
+		Util = Util;
+		Events = {};
+	}, {
+		-- This sucks, and may be redone or removed
+		-- Proxies dispatch methods on to main Cmdr object
+		__index = function (self, k)
+			local r = self.Dispatcher[k]
+			if r and type(r) == "function" then
+				return function (_, ...)
+					return r(self.Dispatcher, ...)
+				end
+			end
+		end
+	})
+
+	Cmdr.Registry = require(Shared.Registry)(Cmdr)
+	Cmdr.Dispatcher = require(Shared.Dispatcher)(Cmdr)
+end
+
+if StarterGui:WaitForChild("Cmdr") and wait() and Player:WaitForChild("PlayerGui"):FindFirstChild("Cmdr") == nil then
+	StarterGui.Cmdr:Clone().Parent = Player.PlayerGui
+end
+
+local Interface = require(script.CmdrInterface)(Cmdr)
+
+--- Sets a list of keyboard keys (Enum.KeyCode) that can be used to open the commands menu
+function Cmdr:SetActivationKeys (keysArray)
+	self.ActivationKeys = Util.MakeDictionary(keysArray)
+end
+
+--- Sets the place name label on the interface
+function Cmdr:SetPlaceName (name)
+	self.PlaceName = name
+	Interface.Window:UpdateLabel()
+end
+
+--- Sets whether or not the console is enabled
+function Cmdr:SetEnabled (enabled)
+	self.Enabled = enabled
+end
+
+--- Sets if activation will free the mouse.
+function Cmdr:SetActivationUnlocksMouse (enabled)
+	self.ActivationUnlocksMouse = enabled
+end
+
+--- Shows Cmdr window
+function Cmdr:Show ()
+	if not self.Enabled then
+		return
+	end
+
+	Interface.Window:Show()
+end
+
+--- Hides Cmdr window
+function Cmdr:Hide ()
+	Interface.Window:Hide()
+end
+
+--- Toggles Cmdr window
+function Cmdr:Toggle ()
+	if not self.Enabled then
+		return self:Hide()
+	end
+
+	Interface.Window:SetVisible(not Interface.Window:IsVisible())
+end
+
+--- Enables the "Mash to open" feature
+function Cmdr:SetMashToEnable(isEnabled)
+	self.MashToEnable = isEnabled
+
+	if isEnabled then
+		self:SetEnabled(false)
+	end
+end
+
+--- Sets the hide on 'lost focus' feature.
+function Cmdr:SetHideOnLostFocus(enabled)
+	self.HideOnLostFocus = enabled
+end
+
+--- Sets the handler for a certain event type
+function Cmdr:HandleEvent(name, callback)
+	self.Events[name] = callback
+end
+
+-- Only register when we aren't in studio because don't want to overwrite what the server portion did
+if RunService:IsServer() == false then
+	Cmdr.Registry:RegisterTypesIn(script:WaitForChild("Types"))
+	Cmdr.Registry:RegisterCommandsIn(script:WaitForChild("Commands"))
+end
+
+-- Hook up event listener
+Cmdr.RemoteEvent.OnClientEvent:Connect(function(name, ...)
+	if Cmdr.Events[name] then
+		Cmdr.Events[name](...)
+	end
+end)
+
+require(script.DefaultEventHandlers)(Cmdr)
+
+return Cmdr
+]]></ProtectedString>
+				<string name="ScriptGuid">{009C8B7A-C579-4D21-9D0F-6E9B26F2EDF7}</string>
+				<BinaryString name="AttributesSerialize"></BinaryString>
+				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+				<bool name="DefinesCapabilities">false</bool>
+				<string name="Name">CmdrClient</string>
+				<int64 name="SourceAssetId">-1</int64>
+				<BinaryString name="Tags"></BinaryString>
+			</Properties>
+			<Item class="ModuleScript" referent="RBXD100EECE2ED3416C96AA322D68CEC262">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[-- Here be dragons
+
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+
+return function (Cmdr)
+	local Util = Cmdr.Util
+
+	local Window = require(script:WaitForChild("Window"))
+	Window.Cmdr = Cmdr
+
+	local AutoComplete = require(script:WaitForChild("AutoComplete"))(Cmdr)
+	Window.AutoComplete = AutoComplete
+
+
+	-- Sets the Window.ProcessEntry callback so that we can dispatch our commands out
+	function Window.ProcessEntry(text)
+		text = Util.TrimString(text)
+
+		if #text == 0 then return end
+
+		Window:AddLine(Window:GetLabel() .. " " .. text, Color3.fromRGB(255, 223, 93))
+
+		Window:AddLine(Cmdr.Dispatcher:EvaluateAndRun(text, Player, {
+			IsHuman = true
+		}))
+	end
+
+	-- Sets the Window.OnTextChanged callback so we can update the auto complete
+	function Window.OnTextChanged (text)
+		local command = Cmdr.Dispatcher:Evaluate(text, Player, true)
+		local arguments = Util.SplitString(text)
+		local commandText = table.remove(arguments, 1)
+		local atEnd = false
+		if command then
+			arguments = Util.MashExcessArguments(arguments, #command.Object.Args)
+
+			atEnd = #arguments == #command.Object.Args
+		end
+
+		local entryComplete = commandText and #arguments > 0
+
+		if text:sub(#text, #text):match("%s") and not atEnd then
+			entryComplete = true
+			arguments[#arguments + 1] = ""
+		end
+
+		if command and entryComplete then
+			local commandValid, errorText = command:Validate()
+
+			Window:SetIsValidInput(commandValid, ("Validation errors: %s"):format(errorText or ""))
+
+			local acItems = {}
+
+			local lastArgument = command:GetArgument(#arguments)
+			if lastArgument then
+				local typedText = lastArgument.TextSegmentInProgress
+
+				local isPartial = false
+				if lastArgument.RawSegmentsAreAutocomplete then
+					for i, segment in ipairs(lastArgument.RawSegments) do
+						acItems[i] = {segment, segment}
+					end
+				else
+					local items, options = lastArgument:GetAutocomplete()
+					options = options or {}
+					isPartial = options.IsPartial or false
+
+					for i, item in pairs(items) do
+						acItems[i] = {typedText, item}
+					end
+				end
+
+				local valid = true
+
+				if #typedText > 0 then
+					valid, errorText = lastArgument:Validate()
+				end
+
+				if not atEnd and valid then
+					Window:HideInvalidState()
+				end
+
+				return AutoComplete:Show(acItems, {
+					at = atEnd and #text - #typedText + (text:sub(#text, #text):match("%s") and -1 or 0);
+					prefix = #lastArgument.RawSegments == 1 and lastArgument.Prefix or "";
+					isLast = #command.Arguments == #command.ArgumentDefinitions and #typedText > 0;
+					numArgs = #arguments;
+					command = command;
+					arg = lastArgument;
+					name = lastArgument.Name .. (lastArgument.Required and "" or "?");
+					type = lastArgument.Type.DisplayName;
+					description = (valid == false and errorText) or lastArgument.Object.Description;
+					invalid = not valid;
+					isPartial = isPartial;
+				})
+			end
+		elseif commandText and #arguments == 0 then
+			Window:SetIsValidInput(true)
+			local exactCommand = Cmdr.Registry:GetCommand(commandText)
+			local exactMatch
+			if exactCommand then
+				exactMatch = {exactCommand.Name, exactCommand.Name, options = {
+					name = exactCommand.Name;
+					description = exactCommand.Description;
+				}}
+
+				local arg = exactCommand.Args and exactCommand.Args[1]
+
+				if type(arg) == "function" then
+					arg = arg(command)
+				end
+
+				if
+					arg
+					and (not arg.Optional
+					and arg.Default == nil)
+				then
+					Window:SetIsValidInput(false, "This command has required arguments.")
+					Window:HideInvalidState()
+				end
+			else
+				Window:SetIsValidInput(false, ("%q is not a valid command name. Use the help command to see all available commands."):format(commandText))
+			end
+
+			local acItems = {exactMatch}
+			for _, cmd in pairs(Cmdr.Registry:GetCommandNames()) do
+				if commandText:lower() == cmd:lower():sub(1, #commandText) and (exactMatch == nil or exactMatch[1] ~= commandText) then
+					local commandObject = Cmdr.Registry:GetCommand(cmd)
+					acItems[#acItems + 1] = {commandText, cmd, options = {
+						name = commandObject.Name;
+						description = commandObject.Description;
+					}}
+				end
+			end
+
+			return AutoComplete:Show(acItems)
+		end
+
+		Window:SetIsValidInput(false, "Use the help command to see all available commands.")
+		AutoComplete:Hide()
+	end
+
+	Window:UpdateLabel()
+	Window:UpdateWindowHeight()
+
+	return {
+		Window = Window;
+		AutoComplete = AutoComplete;
+	}
+end
+]]></ProtectedString>
+					<string name="ScriptGuid">{6AEB0A01-9C11-42A6-8464-7B4D83766064}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">CmdrInterface</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+				<Item class="ModuleScript" referent="RBX2CF060549C944B37ADB8C6CA9517F1A0">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[-- luacheck: ignore 212
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+
+return function(Cmdr)
+	local AutoComplete = {
+		Items = {},
+		ItemOptions = {},
+		SelectedItem = 0,
+	}
+
+	local Util = Cmdr.Util
+
+	local Gui = Player:WaitForChild("PlayerGui"):WaitForChild("Cmdr"):WaitForChild("Autocomplete")
+	local AutoItem = Gui:WaitForChild("TextButton")
+	local Title = Gui:WaitForChild("Title")
+	local Description = Gui:WaitForChild("Description")
+	local Entry = Gui.Parent:WaitForChild("Frame"):WaitForChild("Entry")
+	AutoItem.Parent = nil
+
+	local defaultBarThickness = Gui.ScrollBarThickness
+
+	-- Helper function that sets text and resizes labels
+	local function SetText(obj, textObj, text, sizeFromContents)
+		obj.Visible = text ~= nil
+		textObj.Text = text or ""
+
+		if sizeFromContents then
+			textObj.Size = UDim2.new(
+				0,
+				Util.GetTextSize(text or "", textObj, Vector2.new(1000, 1000), 1, 0).X,
+				obj.Size.Y.Scale,
+				obj.Size.Y.Offset
+			)
+		end
+	end
+
+	local function UpdateContainerSize()
+		Gui.Size = UDim2.new(
+			0,
+			math.max(Title.Field.TextBounds.X + Title.Field.Type.TextBounds.X, Gui.Size.X.Offset),
+			0,
+			math.min(Gui.UIListLayout.AbsoluteContentSize.Y, Gui.Parent.AbsoluteSize.Y - Gui.AbsolutePosition.Y - 10)
+		)
+	end
+
+	-- Update the info display (Name, type, and description) based on given options.
+	local function UpdateInfoDisplay(options)
+		-- Update the objects' text and sizes
+		SetText(Title, Title.Field, options.name, true)
+		SetText(
+			Title.Field.Type,
+			Title.Field.Type,
+			options.type and ": " .. options.type:sub(1, 1):upper() .. options.type:sub(2)
+		)
+		SetText(Description, Description.Label, options.description)
+
+		Description.Label.TextColor3 = options.invalid and Color3.fromRGB(255, 73, 73) or Color3.fromRGB(255, 255, 255)
+		Description.Size = UDim2.new(1, 0, 0, 40)
+
+		-- Flow description text
+		while not Description.Label.TextFits do
+			Description.Size = Description.Size + UDim2.new(0, 0, 0, 2)
+
+			if Description.Size.Y.Offset > 500 then
+				break
+			end
+		end
+
+		-- Update container
+		task.wait()
+		Gui.UIListLayout:ApplyLayout()
+		UpdateContainerSize()
+		Gui.ScrollBarThickness = defaultBarThickness
+	end
+
+	--- Shows the auto complete menu with the given list and possible options
+	-- item = {typedText, suggestedText, options?=options}
+	-- The options table is optional. `at` should only be passed into AutoComplete::Show
+	-- name, type, and description may be passed in an options dictionary inside the items as well
+	-- options.at?: the character index at which to show the menu
+	-- options.name?: The name to display in the info box
+	-- options.type?: The type to display in the info box
+	-- options.prefix?: The current type prefix (%Team)
+	-- options.description?: The description for the currently active info box
+	-- options.invalid?: If true, description is shown in red.
+	-- options.isLast?: If true, auto complete won't keep going after this argument.
+	function AutoComplete:Show(items, options)
+		options = options or {}
+
+		-- Remove old options.
+		for _, item in pairs(self.Items) do
+			if item.gui then
+				item.gui:Destroy()
+			end
+		end
+
+		-- Reset state
+		self.SelectedItem = 1
+		self.Items = items
+		self.Prefix = options.prefix or ""
+		self.LastItem = options.isLast or false
+		self.Command = options.command
+		self.Arg = options.arg
+		self.NumArgs = options.numArgs
+		self.IsPartial = options.isPartial
+
+		-- Generate the new option labels
+		local autocompleteWidth = 200
+
+		Gui.ScrollBarThickness = 0
+
+		for i, item in pairs(self.Items) do
+			local leftText = item[1]
+			local rightText = item[2]
+
+			local btn = AutoItem:Clone()
+			btn.Name = leftText .. rightText
+			btn.BackgroundTransparency = i == self.SelectedItem and 0.5 or 1
+
+			local start, stop = string.find(rightText:lower(), leftText:lower(), 1, true)
+			btn.Typed.Text = string.rep(" ", start - 1) .. leftText
+			btn.Suggest.Text = string.sub(rightText, 0, start - 1)
+				.. string.rep(" ", #leftText)
+				.. string.sub(rightText, stop + 1)
+
+
+			btn.Parent = Gui
+			btn.LayoutOrder = i
+
+			local maxBounds = math.max(btn.Typed.TextBounds.X, btn.Suggest.TextBounds.X) + 20
+			if maxBounds > autocompleteWidth then
+				autocompleteWidth = maxBounds
+			end
+
+			item.gui = btn
+		end
+
+		Gui.UIListLayout:ApplyLayout()
+
+		-- Todo: Use TextService to find accurate position for auto complete box
+		local text = Entry.TextBox.Text
+		local words = Util.SplitString(text)
+		if text:sub(#text, #text) == " " and not options.at then
+			words[#words + 1] = "e"
+		end
+		table.remove(words, #words)
+		local extra = (options.at and options.at or (#table.concat(words, " ") + 1)) * 7
+
+		-- Update the auto complete container
+		Gui.Position =
+			UDim2.new(0, Entry.TextBox.AbsolutePosition.X - 10 + extra, 0, Entry.TextBox.AbsolutePosition.Y + 30)
+		Gui.Size = UDim2.new(0, autocompleteWidth, 0, Gui.UIListLayout.AbsoluteContentSize.Y)
+		Gui.Visible = true
+
+		-- Finally, update thge info display
+		UpdateInfoDisplay(self.Items[1] and self.Items[1].options or options)
+	end
+
+	--- Returns the selected item in the auto complete
+	function AutoComplete:GetSelectedItem()
+		if Gui.Visible == false then
+			return nil
+		end
+
+		return AutoComplete.Items[AutoComplete.SelectedItem]
+	end
+
+	--- Hides the auto complete
+	function AutoComplete:Hide()
+		Gui.Visible = false
+	end
+
+	--- Returns if the menu is visible
+	function AutoComplete:IsVisible()
+		return Gui.Visible
+	end
+
+	--- Changes the user's item selection by the given delta
+	function AutoComplete:Select(delta)
+		if not Gui.Visible then
+			return
+		end
+
+		self.SelectedItem = self.SelectedItem + delta
+
+		if self.SelectedItem > #self.Items then
+			self.SelectedItem = 1
+		elseif self.SelectedItem < 1 then
+			self.SelectedItem = #self.Items
+		end
+
+		for i, item in pairs(self.Items) do
+			item.gui.BackgroundTransparency = i == self.SelectedItem and 0.5 or 1
+		end
+
+		Gui.CanvasPosition = Vector2.new(
+			0,
+			math.max(
+				0,
+				Title.Size.Y.Offset
+					+ Description.Size.Y.Offset
+					+ self.SelectedItem * AutoItem.Size.Y.Offset
+					- Gui.Size.Y.Offset
+			)
+		)
+
+		if self.Items[self.SelectedItem] and self.Items[self.SelectedItem].options then
+			UpdateInfoDisplay(self.Items[self.SelectedItem].options or {})
+		end
+	end
+
+	Gui.Parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateContainerSize)
+
+	return AutoComplete
+end
+]]></ProtectedString>
+						<string name="ScriptGuid">{EF2E2BCC-D71A-4653-A55A-C58CB93F61A2}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">AutoComplete</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXBA9CC67EF1884EC187BC73AF98A11337">
+					<Properties>
+						<Content name="LinkedSource"><null></null></Content>
+						<ProtectedString name="Source"><![CDATA[-- Here be dragons
+-- luacheck: ignore 212
+local GuiService = game:GetService("GuiService")
+local UserInputService = game:GetService("UserInputService")
+local TextChatService = game:GetService("TextChatService")
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+
+local WINDOW_MAX_HEIGHT = 300
+local MOUSE_TOUCH_ENUM = { Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2, Enum.UserInputType.Touch }
+
+--- Window handles the command bar GUI
+local Window = {
+	Valid = true,
+	AutoComplete = nil,
+	ProcessEntry = nil,
+	OnTextChanged = nil,
+	Cmdr = nil,
+	HistoryState = nil,
+}
+
+local Gui = Player:WaitForChild("PlayerGui"):WaitForChild("Cmdr"):WaitForChild("Frame")
+local Line = Gui:WaitForChild("Line")
+local Entry = Gui:WaitForChild("Entry")
+
+Line.Parent = nil
+
+--- Update the text entry label
+function Window:UpdateLabel()
+	Entry.TextLabel.Text = Player.Name .. "@" .. self.Cmdr.PlaceName .. "$"
+end
+
+--- Get the text entry label
+function Window:GetLabel()
+	return Entry.TextLabel.Text
+end
+
+--- Recalculate the window height
+function Window:UpdateWindowHeight()
+	local windowHeight = Gui.UIListLayout.AbsoluteContentSize.Y
+		+ Gui.UIPadding.PaddingTop.Offset
+		+ Gui.UIPadding.PaddingBottom.Offset
+	Gui.Size = UDim2.new(Gui.Size.X.Scale, Gui.Size.X.Offset, 0, math.clamp(windowHeight, 0, WINDOW_MAX_HEIGHT))
+	Gui.CanvasPosition = Vector2.new(0, windowHeight)
+end
+
+--- Add a line to the command bar
+function Window:AddLine(text, options)
+	options = options or {}
+	text = tostring(text)
+
+	if typeof(options) == "Color3" then
+		options = { Color = options }
+	end
+
+	if #text == 0 then
+		Window:UpdateWindowHeight()
+		return
+	end
+
+	local str = self.Cmdr.Util.EmulateTabstops(text or "nil", 8)
+
+	local line = Line:Clone()
+	line.Text = str
+	line.TextColor3 = options.Color or line.TextColor3
+	line.RichText = options.RichText or false
+	line.Parent = Gui
+end
+
+--- Returns if the command bar is visible
+function Window:IsVisible()
+	return Gui.Visible
+end
+
+--- Sets the command bar visible or not
+function Window:SetVisible(visible)
+	Gui.Visible = visible
+
+	if visible then
+		self.PreviousChatWindowConfigurationEnabled = TextChatService.ChatWindowConfiguration.Enabled
+		self.PreviousChatInputBarConfigurationEnabled = TextChatService.ChatInputBarConfiguration.Enabled
+		TextChatService.ChatWindowConfiguration.Enabled = false
+		TextChatService.ChatInputBarConfiguration.Enabled = false
+
+		Entry.TextBox:CaptureFocus()
+		self:SetEntryText("")
+
+		if self.Cmdr.ActivationUnlocksMouse then
+			self.PreviousMouseBehavior = UserInputService.MouseBehavior
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		end
+	else
+		TextChatService.ChatWindowConfiguration.Enabled = if self.PreviousChatWindowConfigurationEnabled ~= nil then 
+			self.PreviousChatWindowConfigurationEnabled else true
+		TextChatService.ChatInputBarConfiguration.Enabled = if self.PreviousChatInputBarConfigurationEnabled ~= nil then 
+			self.PreviousChatInputBarConfigurationEnabled else true
+
+		Entry.TextBox:ReleaseFocus()
+		self.AutoComplete:Hide()
+
+		if self.PreviousMouseBehavior then
+			UserInputService.MouseBehavior = self.PreviousMouseBehavior
+			self.PreviousMouseBehavior = nil
+		end
+	end
+end
+
+--- Hides the command bar
+function Window:Hide()
+	return self:SetVisible(false)
+end
+
+--- Shows the command bar
+function Window:Show()
+	return self:SetVisible(true)
+end
+
+--- Sets the text in the command bar text box, and captures focus
+function Window:SetEntryText(text)
+	Entry.TextBox.Text = text
+
+	if self:IsVisible() then
+		Entry.TextBox:CaptureFocus()
+		Entry.TextBox.CursorPosition = #text + 1
+		Window:UpdateWindowHeight()
+	end
+end
+
+--- Gets the text in the command bar text box
+function Window:GetEntryText()
+	return Entry.TextBox.Text:gsub("\t", "")
+end
+
+--- Sets whether the command is in a valid state or not.
+-- Cannot submit if in invalid state.
+function Window:SetIsValidInput(isValid, errorText)
+	Entry.TextBox.TextColor3 = isValid and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(255, 73, 73)
+	self.Valid = isValid
+	self._errorText = errorText
+end
+
+function Window:HideInvalidState()
+	Entry.TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+end
+
+--- Event handler for text box focus lost
+function Window:LoseFocus(submit)
+	local text = Entry.TextBox.Text
+
+	self:ClearHistoryState()
+
+	if Gui.Visible and not GuiService.MenuIsOpen then
+		-- self:SetEntryText("")
+		Entry.TextBox:CaptureFocus()
+	elseif GuiService.MenuIsOpen and Gui.Visible then
+		self:Hide()
+	end
+
+	if submit and self.Valid then
+		wait()
+		self:SetEntryText("")
+		self.ProcessEntry(text)
+	elseif submit then
+		self:AddLine(self._errorText, Color3.fromRGB(255, 153, 153))
+	end
+end
+
+function Window:TraverseHistory(delta)
+	local history = self.Cmdr.Dispatcher:GetHistory()
+
+	if self.HistoryState == nil then
+		self.HistoryState = {
+			Position = #history + 1,
+			InitialText = self:GetEntryText(),
+		}
+	end
+
+	self.HistoryState.Position = math.clamp(self.HistoryState.Position + delta, 1, #history + 1)
+
+	self:SetEntryText(
+		self.HistoryState.Position == #history + 1 and self.HistoryState.InitialText
+			or history[self.HistoryState.Position]
+	)
+end
+
+function Window:ClearHistoryState()
+	self.HistoryState = nil
+end
+
+function Window:SelectVertical(delta)
+	if self.AutoComplete:IsVisible() and not self.HistoryState then
+		self.AutoComplete:Select(delta)
+	else
+		self:TraverseHistory(delta)
+	end
+end
+
+local lastPressTime = 0
+local pressCount = 0
+--- Handles user input when the box is focused
+function Window:BeginInput(input, gameProcessed)
+	if GuiService.MenuIsOpen then
+		self:Hide()
+	end
+
+	if gameProcessed and self:IsVisible() == false then
+		return
+	end
+
+	if self.Cmdr.ActivationKeys[input.KeyCode] then -- Activate the command bar
+		if self.Cmdr.MashToEnable and not self.Cmdr.Enabled then
+			if tick() - lastPressTime < 1 then
+				if pressCount >= 5 then
+					return self.Cmdr:SetEnabled(true)
+				else
+					pressCount = pressCount + 1
+				end
+			else
+				pressCount = 1
+			end
+			lastPressTime = tick()
+		elseif self.Cmdr.Enabled then
+			self:SetVisible(not self:IsVisible())
+			wait()
+			self:SetEntryText("")
+
+			if GuiService.MenuIsOpen then -- Special case for menu getting stuck open (roblox bug)
+				self:Hide()
+			end
+		end
+
+		return
+	end
+
+	if self.Cmdr.Enabled == false or not self:IsVisible() then
+		if self:IsVisible() then
+			self:Hide()
+		end
+
+		return
+	end
+
+	if self.Cmdr.HideOnLostFocus and table.find(MOUSE_TOUCH_ENUM, input.UserInputType) then
+		local ps = input.Position
+		local ap = Gui.AbsolutePosition
+		local as = Gui.AbsoluteSize
+		if ps.X < ap.X or ps.X > ap.X + as.X or ps.Y < ap.Y or ps.Y > ap.Y + as.Y then
+			self:Hide()
+		end
+	elseif input.KeyCode == Enum.KeyCode.Down then -- Auto Complete Down
+		self:SelectVertical(1)
+	elseif input.KeyCode == Enum.KeyCode.Up then -- Auto Complete Up
+		self:SelectVertical(-1)
+	elseif input.KeyCode == Enum.KeyCode.Return then -- Eat new lines
+		wait()
+		self:SetEntryText(self:GetEntryText():gsub("\n", ""):gsub("\r", ""))
+	elseif input.KeyCode == Enum.KeyCode.Tab then -- Auto complete
+		local item = self.AutoComplete:GetSelectedItem()
+		local text = self:GetEntryText()
+		if item and not (text:sub(#text, #text):match("%s") and self.AutoComplete.LastItem) then
+			local replace = item[2]
+			local newText
+			local insertSpace = true
+			local command = self.AutoComplete.Command
+
+			if command then
+				local lastArg = self.AutoComplete.Arg
+
+				newText = command.Alias
+				insertSpace = self.AutoComplete.NumArgs ~= #command.ArgumentDefinitions
+					and self.AutoComplete.IsPartial == false
+
+				local args = command.Arguments
+				for i = 1, #args do
+					local arg = args[i]
+					local segments = arg.RawSegments
+					if arg == lastArg then
+						segments[#segments] = replace
+					end
+
+					local argText = arg.Prefix .. table.concat(segments, ",")
+
+					-- Put auto completion options in quotation marks if they have a space
+					if argText:find(" ") or argText == "" then
+						argText = ("%q"):format(argText)
+					end
+
+					newText = ("%s %s"):format(newText, argText)
+
+					if arg == lastArg then
+						break
+					end
+				end
+			else
+				newText = replace
+			end
+			-- need to wait a frame so we can eat the \t
+			wait()
+			-- Update the text box
+			self:SetEntryText(newText .. (insertSpace and " " or ""))
+		else
+			-- Still need to eat the \t even if there is no auto-complete to show
+			wait()
+			self:SetEntryText(self:GetEntryText())
+		end
+	else
+		self:ClearHistoryState()
+	end
+end
+
+-- Hook events
+Entry.TextBox.FocusLost:Connect(function(submit)
+	return Window:LoseFocus(submit)
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	return Window:BeginInput(input, gameProcessed)
+end)
+
+Entry.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+	Gui.CanvasPosition = Vector2.new(0, Gui.AbsoluteCanvasSize.Y)
+
+	if Entry.TextBox.Text:match("\t") then -- Eat \t
+		Entry.TextBox.Text = Entry.TextBox.Text:gsub("\t", "")
+		return
+	end
+	if Window.OnTextChanged then
+		return Window.OnTextChanged(Entry.TextBox.Text)
+	end
+end)
+
+Gui.ChildAdded:Connect(function()
+	task.defer(Window.UpdateWindowHeight)
+end)
+
+return Window
+]]></ProtectedString>
+						<string name="ScriptGuid">{D1AA6F17-9F8D-4AEE-BAB0-1F24C0FDE182}</string>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<string name="Name">Window</string>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+			</Item>
+			<Item class="ModuleScript" referent="RBX8C667ADAE3614457A485A2FD703829A2">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local StarterGui = game:GetService("StarterGui")
+local Window = require(script.Parent.CmdrInterface.Window)
+
+return function (Cmdr)
+	Cmdr:HandleEvent("Message", function (text)
+		StarterGui:SetCore("ChatMakeSystemMessage", {
+			Text = ("[Announcement] %s"):format(text);
+			Color = Color3.fromRGB(249, 217, 56);
+		})
+	end)
+
+	Cmdr:HandleEvent("AddLine", function (...)
+		Window:AddLine(...)
+	end)
+end]]></ProtectedString>
+					<string name="ScriptGuid">{ECE36B07-2338-4ED6-92A3-8B5E80EF87D1}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">DefaultEventHandlers</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+		</Item>
+		<Item class="ModuleScript" referent="RBX8FCBAC66902246E6852BFF67A4B2B466">
+			<Properties>
+				<Content name="LinkedSource"><null></null></Content>
+				<ProtectedString name="Source"><![CDATA[return function()
+	local Cmdr = Instance.new("ScreenGui")
+	Cmdr.DisplayOrder = 1000
+	Cmdr.Name = "Cmdr"
+	Cmdr.ResetOnSpawn = false
+	Cmdr.AutoLocalize = false
+
+	local Frame = Instance.new("ScrollingFrame")
+	Frame.BackgroundColor3 = Color3.fromRGB(17, 17, 17)
+	Frame.BackgroundTransparency = 0.4
+	Frame.BorderSizePixel = 0
+	Frame.CanvasSize = UDim2.new(0, 0, 0, 0)
+	Frame.Name = "Frame"
+	Frame.Position = UDim2.new(0.025, 0, 0, 25)
+	Frame.ScrollBarThickness = 6
+	Frame.ScrollingDirection = Enum.ScrollingDirection.Y
+	Frame.Selectable = false
+	Frame.Size = UDim2.new(0.95, 0, 0, 0)
+	Frame.Visible = false
+	Frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	Frame.Parent = Cmdr
+
+	local Autocomplete = Instance.new("ScrollingFrame")
+	Autocomplete.BackgroundColor3 = Color3.fromRGB(59, 59, 59)
+	Autocomplete.BackgroundTransparency = 0.5
+	Autocomplete.BorderSizePixel = 0
+	Autocomplete.CanvasSize = UDim2.new(0, 0, 0, 0)
+	Autocomplete.Name = "Autocomplete"
+	Autocomplete.Position = UDim2.new(0, 167, 0, 75)
+	Autocomplete.ScrollBarThickness = 6
+	Autocomplete.ScrollingDirection = Enum.ScrollingDirection.Y
+	Autocomplete.Selectable = false
+	Autocomplete.Size = UDim2.new(0, 200, 0, 200)
+	Autocomplete.Visible = false
+	Autocomplete.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	Autocomplete.Parent = Cmdr
+
+	local UIListLayout = Instance.new("UIListLayout")
+	UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	UIListLayout.Parent = Frame
+
+	local Line = Instance.new("TextBox")
+	Line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	Line.BackgroundTransparency = 1
+	Line.Font = Enum.Font.Code
+	Line.Name = "Line"
+	Line.Size = UDim2.new(1, 0, 0, 20)
+	Line.AutomaticSize = Enum.AutomaticSize.Y
+	Line.TextColor3 = Color3.fromRGB(255, 255, 255)
+	Line.TextSize = 14
+	Line.TextXAlignment = Enum.TextXAlignment.Left
+	Line.TextEditable = false
+	Line.ClearTextOnFocus = false
+	Line.Parent = Frame
+
+	local UIPadding = Instance.new("UIPadding")
+	UIPadding.PaddingBottom = UDim.new(0, 10)
+	UIPadding.PaddingLeft = UDim.new(0, 10)
+	UIPadding.PaddingRight = UDim.new(0, 10)
+	UIPadding.PaddingTop = UDim.new(0, 10)
+	UIPadding.Parent = Frame
+
+	local Entry = Instance.new("Frame")
+	Entry.BackgroundTransparency = 1
+	Entry.LayoutOrder = 999999999
+	Entry.Name = "Entry"
+	Entry.Size = UDim2.new(1, 0, 0, 20)
+	Entry.Parent = Frame
+
+	local UIListLayout2 = Instance.new("UIListLayout")
+	UIListLayout2.SortOrder = Enum.SortOrder.LayoutOrder
+	UIListLayout2.Parent = Autocomplete
+
+	local Title = Instance.new("Frame")
+	Title.BackgroundColor3 = Color3.fromRGB(59, 59, 59)
+	Title.BackgroundTransparency = 0.2
+	Title.BorderSizePixel = 0
+	Title.LayoutOrder = -2
+	Title.Name = "Title"
+	Title.Size = UDim2.new(1, 0, 0, 40)
+	Title.Parent = Autocomplete
+
+	local Description = Instance.new("Frame")
+	Description.BackgroundColor3 = Color3.fromRGB(59, 59, 59)
+	Description.BackgroundTransparency = 0.2
+	Description.BorderSizePixel = 0
+	Description.LayoutOrder = -1
+	Description.Name = "Description"
+	Description.Size = UDim2.new(1, 0, 0, 20)
+	Description.Parent = Autocomplete
+
+	local TextButton = Instance.new("TextButton")
+	TextButton.BackgroundColor3 = Color3.fromRGB(59, 59, 59)
+	TextButton.BackgroundTransparency = 0.5
+	TextButton.BorderSizePixel = 0
+	TextButton.Font = Enum.Font.Code
+	TextButton.Size = UDim2.new(1, 0, 0, 30)
+	TextButton.Text = ""
+	TextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	TextButton.TextSize = 14
+	TextButton.TextXAlignment = Enum.TextXAlignment.Left
+	TextButton.Parent = Autocomplete
+
+	local UIListLayout3 = Instance.new("UIListLayout")
+	UIListLayout3.FillDirection = Enum.FillDirection.Horizontal
+	UIListLayout3.SortOrder = Enum.SortOrder.LayoutOrder
+	UIListLayout3.Padding = UDim.new(0, 7)
+	UIListLayout3.Parent = Entry
+
+	local TextBox = Instance.new("TextBox")
+	TextBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	TextBox.BackgroundTransparency = 1
+	TextBox.ClearTextOnFocus = false
+	TextBox.Font = Enum.Font.Code
+	TextBox.LayoutOrder = 999999999
+	TextBox.Position = UDim2.new(0, 140, 0, 0)
+	TextBox.Size = UDim2.new(1, 0, 0, 20)
+	TextBox.Text = "x"
+	TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+	TextBox.TextSize = 14
+	TextBox.TextXAlignment = Enum.TextXAlignment.Left
+	TextBox.Selectable = false
+	TextBox.Parent = Entry
+
+	local TextLabel = Instance.new("TextLabel")
+	TextLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	TextLabel.BackgroundTransparency = 1
+	TextLabel.Font = Enum.Font.Code
+	TextLabel.Size = UDim2.new(0, 0, 0, 20)
+	TextLabel.AutomaticSize = Enum.AutomaticSize.X
+	TextLabel.Text = ""
+	TextLabel.TextColor3 = Color3.fromRGB(255, 223, 93)
+	TextLabel.TextSize = 14
+	TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+	TextLabel.Parent = Entry
+
+	local Field = Instance.new("TextLabel")
+	Field.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	Field.BackgroundTransparency = 1
+	Field.Font = Enum.Font.SourceSansBold
+	Field.Name = "Field"
+	Field.Size = UDim2.new(0, 37, 1, 0)
+	Field.Text = "from"
+	Field.TextColor3 = Color3.fromRGB(255, 255, 255)
+	Field.TextSize = 20
+	Field.TextXAlignment = Enum.TextXAlignment.Left
+	Field.Parent = Title
+
+	local UIPadding2 = Instance.new("UIPadding")
+	UIPadding2.PaddingLeft = UDim.new(0, 10)
+	UIPadding2.Parent = Title
+
+	local Label = Instance.new("TextLabel")
+	Label.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	Label.BackgroundTransparency = 1
+	Label.Font = Enum.Font.SourceSansLight
+	Label.Name = "Label"
+	Label.Size = UDim2.new(1, 0, 1, 0)
+	Label.Text = "The players to teleport. The players to teleport. The players to teleport. The players to teleport. "
+	Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+	Label.TextSize = 16
+	Label.TextWrapped = true
+	Label.TextXAlignment = Enum.TextXAlignment.Left
+	Label.TextYAlignment = Enum.TextYAlignment.Top
+	Label.Parent = Description
+
+	local UIPadding3 = Instance.new("UIPadding")
+	UIPadding3.PaddingBottom = UDim.new(0, 10)
+	UIPadding3.PaddingLeft = UDim.new(0, 10)
+	UIPadding3.PaddingRight = UDim.new(0, 10)
+	UIPadding3.Parent = Description
+
+	local Typed = Instance.new("TextLabel")
+	Typed.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	Typed.BackgroundTransparency = 1
+	Typed.Font = Enum.Font.Code
+	Typed.Name = "Typed"
+	Typed.Size = UDim2.new(1, 0, 1, 0)
+	Typed.Text = "Lab"
+	Typed.TextColor3 = Color3.fromRGB(131, 222, 255)
+	Typed.TextSize = 14
+	Typed.TextXAlignment = Enum.TextXAlignment.Left
+	Typed.Parent = TextButton
+
+	local UIPadding4 = Instance.new("UIPadding")
+	UIPadding4.PaddingLeft = UDim.new(0, 10)
+	UIPadding4.Parent = TextButton
+
+	local Suggest = Instance.new("TextLabel")
+	Suggest.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	Suggest.BackgroundTransparency = 1
+	Suggest.Font = Enum.Font.Code
+	Suggest.Name = "Suggest"
+	Suggest.Size = UDim2.new(1, 0, 1, 0)
+	Suggest.Text = "   el"
+	Suggest.TextColor3 = Color3.fromRGB(255, 255, 255)
+	Suggest.TextSize = 14
+	Suggest.TextXAlignment = Enum.TextXAlignment.Left
+	Suggest.Parent = TextButton
+
+	local Type = Instance.new("TextLabel")
+	Type.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	Type.BackgroundTransparency = 1
+	Type.BorderColor3 = Color3.fromRGB(255, 153, 153)
+	Type.Font = Enum.Font.SourceSans
+	Type.Name = "Type"
+	Type.Position = UDim2.new(1, 0, 0, 0)
+	Type.Size = UDim2.new(0, 0, 1, 0)
+	Type.Text = ": Players"
+	Type.TextColor3 = Color3.fromRGB(255, 255, 255)
+	Type.TextSize = 15
+	Type.TextXAlignment = Enum.TextXAlignment.Left
+	Type.Parent = Field
+
+	Cmdr.Parent = game:GetService("StarterGui")
+	return Cmdr
+end
+]]></ProtectedString>
+				<string name="ScriptGuid">{A09B6711-04B9-47CB-88B0-353E0C7BECE6}</string>
+				<BinaryString name="AttributesSerialize"></BinaryString>
+				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+				<bool name="DefinesCapabilities">false</bool>
+				<string name="Name">CreateGui</string>
+				<int64 name="SourceAssetId">-1</int64>
+				<BinaryString name="Tags"></BinaryString>
+			</Properties>
+		</Item>
+		<Item class="ModuleScript" referent="RBXD03AA5C325194A168A88593A03335E2E">
+			<Properties>
+				<Content name="LinkedSource"><null></null></Content>
+				<ProtectedString name="Source"><![CDATA[local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local CreateGui = require(script.Parent.CreateGui)
+
+--- Handles initial preparation of the game server-side.
+return function (cmdr)
+	local ReplicatedRoot, RemoteFunction, RemoteEvent
+
+	local function Create (class, name, parent)
+		local object = Instance.new(class)
+		object.Name = name
+		object.Parent = parent or ReplicatedRoot
+
+		return object
+	end
+
+	ReplicatedRoot = script.Parent.CmdrClient
+	ReplicatedRoot.Parent = ReplicatedStorage
+
+	RemoteFunction = Create("RemoteFunction", "CmdrFunction")
+	RemoteEvent = Create("RemoteEvent", "CmdrEvent")
+
+	Create("Folder", "Commands")
+	Create("Folder", "Types")
+
+	script.Parent.Shared.Parent = ReplicatedRoot
+
+	cmdr.ReplicatedRoot = ReplicatedRoot
+	cmdr.RemoteFunction = RemoteFunction
+	cmdr.RemoteEvent = RemoteEvent
+
+	cmdr:RegisterTypesIn(script.Parent.BuiltInTypes)
+
+	script.Parent.BuiltInTypes:Destroy()
+	script.Parent.BuiltInCommands.Name = "Server commands"
+
+	if StarterGui:FindFirstChild("Cmdr") == nil then
+		CreateGui()
+	end
+end
+]]></ProtectedString>
+				<string name="ScriptGuid">{3A49D795-A500-4D8B-92C0-B51DE28C9D2F}</string>
+				<BinaryString name="AttributesSerialize"></BinaryString>
+				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+				<bool name="DefinesCapabilities">false</bool>
+				<string name="Name">Initialize</string>
+				<int64 name="SourceAssetId">-1</int64>
+				<BinaryString name="Tags"></BinaryString>
+			</Properties>
+		</Item>
+		<Item class="Folder" referent="RBX091E5F6CC6B147C4B876AF89EAF786AB">
+			<Properties>
+				<BinaryString name="AttributesSerialize"></BinaryString>
+				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+				<bool name="DefinesCapabilities">false</bool>
+				<string name="Name">Shared</string>
+				<int64 name="SourceAssetId">-1</int64>
+				<BinaryString name="Tags"></BinaryString>
+			</Properties>
+			<Item class="ModuleScript" referent="RBX38349C75620E4F818BC0CD596A69CEDA">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local Util = require(script.Parent.Util)
+
+local function unescapeOperators(text)
+	for _, operator in ipairs({"%.", "%?", "%*", "%*%*"}) do
+		text = text:gsub("\\" .. operator, operator:gsub("%%", ""))
+	end
+
+	return text
+end
+
+local Argument = {}
+Argument.__index = Argument
+
+--- Returns a new ArgumentContext, an object that handles parsing and validating arguments
+function Argument.new (command, argumentObject, value)
+	local self = {
+		Command = command; -- The command that owns this argument
+		Type = nil; -- The type definition
+		Name = argumentObject.Name; -- The name for this specific argument
+		Object = argumentObject; -- The raw ArgumentObject (definition)
+		Required = argumentObject.Default == nil and argumentObject.Optional ~= true; -- If the argument is required or not.
+		Executor = command.Executor; -- The player who is running the command
+		RawValue = value; -- The raw, unparsed value
+		RawSegments = {}; -- The raw, unparsed segments (if the raw value was comma-sep)
+		TransformedValues = {}; -- The transformed value (generated later)
+		Prefix = ""; -- The prefix for this command (%Team)
+		TextSegmentInProgress = ""; -- The text of the raw segment the user is currently typing.
+		RawSegmentsAreAutocomplete = false;
+	}
+
+	if type(argumentObject.Type) == "table" then
+		self.Type = argumentObject.Type
+	else
+		local parsedType, parsedRawValue, prefix = Util.ParsePrefixedUnionType(
+			command.Cmdr.Registry:GetTypeName(argumentObject.Type),
+			value
+		)
+
+		self.Type = command.Dispatcher.Registry:GetType(parsedType)
+		self.RawValue = parsedRawValue
+		self.Prefix = prefix
+
+		if self.Type == nil then
+			error(string.format("%s has an unregistered type %q", self.Name or "<none>", parsedType or "<none>"))
+		end
+	end
+
+	setmetatable(self, Argument)
+
+	self:Transform()
+
+	return self
+end
+
+function Argument:GetDefaultAutocomplete()
+	if self.Type.Autocomplete then
+		local strings, options = self.Type.Autocomplete(self:TransformSegment(""))
+		return strings, options or {}
+	end
+
+	return {}
+end
+
+--- Calls the transform function on this argument.
+-- The return value(s) from this function are passed to all of the other argument methods.
+-- Called automatically at instantiation
+function Argument:Transform()
+	if #self.TransformedValues ~= 0 then
+		return
+	end
+
+	local rawValue = self.RawValue
+	if self.Type.ArgumentOperatorAliases then
+		rawValue = self.Type.ArgumentOperatorAliases[rawValue] or rawValue
+	end
+
+	if rawValue == "." and self.Type.Default then
+		rawValue = self.Type.Default(self.Executor) or ""
+		self.RawSegmentsAreAutocomplete = true
+	end
+
+	if rawValue == "?" and self.Type.Autocomplete then
+		local strings, options = self:GetDefaultAutocomplete()
+
+		if not options.IsPartial and #strings > 0 then
+			rawValue = strings[math.random(1, #strings)]
+			self.RawSegmentsAreAutocomplete = true
+		end
+
+	end
+
+	if self.Type.Listable and #self.RawValue > 0 then
+		local randomMatch = rawValue:match("^%?(%d+)$")
+		if randomMatch then
+			local maxSize = tonumber(randomMatch)
+
+			if maxSize and maxSize > 0 then
+				local items = {}
+				local remainingItems, options = self:GetDefaultAutocomplete()
+
+				if not options.IsPartial and #remainingItems > 0 then
+					for _ = 1, math.min(maxSize, #remainingItems) do
+						table.insert(items, table.remove(remainingItems, math.random(1, #remainingItems)))
+					end
+
+					rawValue = table.concat(items, ",")
+					self.RawSegmentsAreAutocomplete = true
+				end
+			end
+		elseif rawValue == "*" or rawValue == "**" then
+			local strings, options = self:GetDefaultAutocomplete()
+
+			if not options.IsPartial and #strings > 0 then
+				if rawValue == "**" and self.Type.Default then
+					local defaultString = self.Type.Default(self.Executor) or ""
+
+					for i, string in ipairs(strings) do
+						if string == defaultString then
+							table.remove(strings, i)
+						end
+					end
+				end
+
+				rawValue = table.concat(
+					strings,
+					","
+				)
+				self.RawSegmentsAreAutocomplete = true
+			end
+		end
+
+		rawValue = unescapeOperators(rawValue)
+
+		local rawSegments = Util.SplitStringSimple(rawValue, ",")
+
+		if #rawSegments == 0 then
+			rawSegments = {""}
+		end
+
+		if rawValue:sub(#rawValue, #rawValue) == "," then
+			rawSegments[#rawSegments + 1] = "" -- makes auto complete tick over right after pressing ,
+		end
+
+		for i, rawSegment in ipairs(rawSegments) do
+			self.RawSegments[i] = rawSegment
+			self.TransformedValues[i] = { self:TransformSegment(rawSegment) }
+		end
+
+		self.TextSegmentInProgress = rawSegments[#rawSegments]
+	else
+		rawValue = unescapeOperators(rawValue)
+
+		self.RawSegments[1] = unescapeOperators(rawValue)
+		self.TransformedValues[1] = { self:TransformSegment(rawValue) }
+		self.TextSegmentInProgress = self.RawValue
+	end
+end
+
+function Argument:TransformSegment(rawSegment)
+	if self.Type.Transform then
+		return self.Type.Transform(rawSegment, self.Executor)
+	else
+		return rawSegment
+	end
+end
+
+--- Returns whatever the Transform method gave us.
+function Argument:GetTransformedValue(segment)
+	return unpack(self.TransformedValues[segment])
+end
+
+--- Validates that the argument will work without any type errors.
+function Argument:Validate(isFinal)
+	if self.RawValue == nil or #self.RawValue == 0 and self.Required == false then
+		return true
+	end
+
+	if self.Required and (self.RawSegments[1] == nil or #self.RawSegments[1] == 0) then
+		return false, "This argument is required."
+	end
+
+	if self.Type.Validate or self.Type.ValidateOnce then
+		for i = 1, #self.TransformedValues do
+			if self.Type.Validate then
+				local valid, errorText = self.Type.Validate(self:GetTransformedValue(i))
+
+				if not valid then
+					return valid, errorText or "Invalid value"
+				end
+			end
+
+			if isFinal and self.Type.ValidateOnce then
+				local validOnce, errorTextOnce = self.Type.ValidateOnce(self:GetTransformedValue(i))
+
+				if not validOnce then
+					return validOnce, errorTextOnce
+				end
+			end
+		end
+
+		return true
+	else
+		return true
+	end
+end
+
+--- Gets a list of all possible values that could match based on the current value.
+function Argument:GetAutocomplete()
+	if self.Type.Autocomplete then
+		return self.Type.Autocomplete(self:GetTransformedValue(#self.TransformedValues))
+	else
+		return {}
+	end
+end
+
+function Argument:ParseValue(i)
+	if self.Type.Parse then
+		return self.Type.Parse(self:GetTransformedValue(i))
+	else
+		return self:GetTransformedValue(i)
+	end
+end
+
+--- Returns the final value of the argument.
+function Argument:GetValue()
+	if #self.RawValue == 0 and not self.Required and self.Object.Default ~= nil then
+		return self.Object.Default
+	end
+
+	if not self.Type.Listable then
+		return self:ParseValue(1)
+	end
+
+	local values = {}
+
+	for i = 1, #self.TransformedValues do
+		local parsedValue = self:ParseValue(i)
+
+		if type(parsedValue) ~= "table" then
+			error(("Listable types must return a table from Parse (%s)"):format(self.Type.Name))
+		end
+
+		for _, value in pairs(parsedValue) do
+			values[value] = true -- Put them into a dictionary to ensure uniqueness
+		end
+	end
+
+	local valueArray = {}
+
+	for value in pairs(values) do
+		valueArray[#valueArray + 1] = value
+	end
+
+	return valueArray
+end
+
+return Argument
+]]></ProtectedString>
+					<string name="ScriptGuid">{D46E920F-B973-4CDC-A07C-1E2C8FE4D3A2}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Argument</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX4CE109B261DA47F081D40E220600357C">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local Argument = require(script.Parent.Argument)
+
+local IsServer = RunService:IsServer()
+
+local Command = {}
+Command.__index = Command
+
+--- Returns a new CommandContext, an object which is created for every command validation.
+-- This is also what's passed as the context to the "Run" functions in commands
+function Command.new (options)
+	local self = {
+		Dispatcher = options.Dispatcher; -- The dispatcher that created this command context
+		Cmdr = options.Dispatcher.Cmdr; -- A quick reference to Cmdr for command context
+		Name = options.CommandObject.Name; -- The command name (not alias)
+		RawText = options.Text; -- The raw text used to trigger this command
+		Object = options.CommandObject; -- The command object (definition)
+		Group = options.CommandObject.Group; -- The group this command is in
+		State = {}; -- A table which will hold any custom command state information
+		Aliases = options.CommandObject.Aliases;
+		Alias = options.Alias; -- The command name that was used
+		Description = options.CommandObject.Description;
+		Executor = options.Executor; -- The player who ran the command
+		ArgumentDefinitions = options.CommandObject.Args; -- The argument definitions from the command definition
+		RawArguments = options.Arguments; -- Array of strings which are the unparsed values for the arguments
+		Arguments = {}; -- A table which will hold ArgumentContexts for each argument
+		Data = options.Data; -- A special container for any additional data the command needs to collect from the client
+		Response = nil; -- Will be set at the very end when the command is run and a string is returned from the Run function.
+	}
+
+	setmetatable(self, Command)
+
+	return self
+end
+
+--- Parses all of the command arguments into ArgumentContexts
+-- Called by the command dispatcher automatically
+-- allowIncompleteArguments: if true, will not throw an error for missing arguments
+function Command:Parse (allowIncompleteArguments)
+	local hadOptional = false
+	for i, definition in ipairs(self.ArgumentDefinitions) do
+		if type(definition) == "function" then
+			definition = definition(self)
+
+			if definition == nil then
+				break
+			end
+		end
+
+		local required = (definition.Default == nil and definition.Optional ~= true)
+
+		if required and hadOptional then
+			error(("Command %q: Required arguments cannot occur after optional arguments."):format(self.Name))
+		elseif not required then
+			hadOptional = true
+		end
+
+		if self.RawArguments[i] == nil and required and allowIncompleteArguments ~= true then
+			return false, ("Required argument #%d %s is missing."):format(i, definition.Name)
+		elseif self.RawArguments[i] or allowIncompleteArguments then
+			self.Arguments[i] = Argument.new(self, definition, self.RawArguments[i] or "")
+		end
+	end
+
+	return true
+end
+
+--- Validates that all of the arguments are in a valid state.
+-- This must be called before :Run() is called.
+-- Returns boolean (true if ok), errorText
+function Command:Validate (isFinal)
+	self._Validated = true
+	local errorText = ""
+	local success = true
+
+	for i, arg in pairs(self.Arguments) do
+		local argSuccess, argErrorText = arg:Validate(isFinal)
+
+		if not argSuccess then
+			success = false
+			errorText = ("%s; #%d %s: %s"):format(errorText, i, arg.Name, argErrorText or "error")
+		end
+	end
+
+	return success, errorText:sub(3)
+end
+
+--- Returns the last argument that has a value.
+-- Useful for getting the autocomplete for the argument the user is working on.
+function Command:GetLastArgument()
+	for i = #self.Arguments, 1, -1 do
+		if self.Arguments[i].RawValue then
+			return self.Arguments[i]
+		end
+	end
+end
+
+--- Returns a table containing the parsed values for all of the arguments.
+function Command:GatherArgumentValues ()
+	local values = {}
+
+	for i = 1, #self.ArgumentDefinitions do
+		local arg = self.Arguments[i]
+		if arg then
+			values[i] = arg:GetValue()
+		elseif type(self.ArgumentDefinitions[i]) == "table" then
+			values[i] = self.ArgumentDefinitions[i].Default
+		end
+	end
+
+	return values, #self.ArgumentDefinitions
+end
+
+--- Runs the command. Handles dispatching to the server if necessary.
+-- Command:Validate() must be called before this is called or it will throw.
+function Command:Run ()
+	if self._Validated == nil then
+		error("Must validate a command before running.")
+	end
+
+	local beforeRunHook = self.Dispatcher:RunHooks("BeforeRun", self)
+	if beforeRunHook then
+		return beforeRunHook
+	end
+
+	if not IsServer and self.Object.Data and self.Data == nil then
+		local values, length = self:GatherArgumentValues()
+		self.Data = self.Object.Data(self, unpack(values, 1, length))
+	end
+
+	if not IsServer and self.Object.ClientRun then
+		local values, length = self:GatherArgumentValues()
+		self.Response = self.Object.ClientRun(self, unpack(values, 1, length))
+	end
+
+	if self.Response == nil then
+		if self.Object.Run then -- We can just Run it here on this machine
+			local values, length = self:GatherArgumentValues()
+			self.Response = self.Object.Run(self, unpack(values, 1, length))
+
+		elseif IsServer then -- Uh oh, we're already on the server and there's no Run function.
+			if self.Object.ClientRun then
+				warn(self.Name, "command fell back to the server because ClientRun returned nil, but there is no server implementation! Either return a string from ClientRun, or create a server implementation for this command.")
+			else
+				warn(self.Name, "command has no implementation!")
+			end
+
+			self.Response = "No implementation."
+		else -- We're on the client, so we send this off to the server to let the server see what it can do with it.
+			self.Response = self.Dispatcher:Send(self.RawText, self.Data)
+		end
+	end
+
+	local afterRunHook = self.Dispatcher:RunHooks("AfterRun", self)
+	if afterRunHook then
+		return afterRunHook
+	else
+		return self.Response
+	end
+end
+
+--- Returns an ArgumentContext for the specific index
+function Command:GetArgument (index)
+	return self.Arguments[index]
+end
+
+-- Below are functions that are only meant to be used in command implementations --
+
+--- Returns the extra data associated with this command.
+-- This needs to be used instead of just context.Data for reliability when not using a remote command.
+function Command:GetData ()
+	if self.Data then
+		return self.Data
+	end
+
+	if self.Object.Data and not IsServer then
+		self.Data = self.Object.Data(self)
+	end
+
+	return self.Data
+end
+
+--- Sends an event message to a player
+function Command:SendEvent(player, event, ...)
+	assert(typeof(player) == "Instance", "Argument #1 must be a Player")
+	assert(player:IsA("Player"), "Argument #1 must be a Player")
+	assert(type(event) == "string", "Argument #2 must be a string")
+
+	if IsServer then
+		self.Dispatcher.Cmdr.RemoteEvent:FireClient(player, event, ...)
+	elseif self.Dispatcher.Cmdr.Events[event] then
+		assert(player == Players.LocalPlayer, "Event messages can only be sent to the local player on the client.")
+		self.Dispatcher.Cmdr.Events[event](...)
+	end
+end
+
+--- Sends an event message to all players
+function Command:BroadcastEvent(...)
+	if not IsServer then
+		error("Can't broadcast event messages from the client.", 2)
+	end
+
+	self.Dispatcher.Cmdr.RemoteEvent:FireAllClients(...)
+end
+
+--- Alias of self:SendEvent(self.Executor, "AddLine", text)
+function Command:Reply(...)
+	return self:SendEvent(self.Executor, "AddLine", ...)
+end
+
+--- Alias of Registry:GetStore(...)
+function Command:GetStore(...)
+	return self.Dispatcher.Cmdr.Registry:GetStore(...)
+end
+
+--- Returns true if the command has an implementation on the caller's machine.
+function Command:HasImplementation()
+	return ((RunService:IsClient() and self.Object.ClientRun) or self.Object.Run) and true or false
+end
+
+return Command
+]]></ProtectedString>
+					<string name="ScriptGuid">{9A529AA8-01D2-4153-AB4E-CA5C3B040BCE}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Command</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBXEE4CC6DE2E09476C9177ECC2DB5BE5A8">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local Util = require(script.Parent.Util)
+local Command = require(script.Parent.Command)
+
+local HISTORY_SETTING_NAME = "CmdrCommandHistory"
+local displayedBeforeRunHookWarning = false
+
+--- The dispatcher handles creating and running commands during the game.
+local Dispatcher = {
+	Cmdr = nil;
+	Registry = nil;
+}
+
+--- Takes in raw command information and generates a command out of it.
+-- text and executor are required arguments.
+-- allowIncompleteData, when true, will ignore errors about arguments missing so we can parse live as the user types.
+-- data is for special networked Data about the command gathered on the client. Purely Optional.
+-- returns the command if successful, or (false, errorText) if not
+function Dispatcher:Evaluate (text, executor, allowIncompleteArguments, data)
+	if RunService:IsClient() == true and executor ~= Players.LocalPlayer then
+		error("Can't evaluate a command that isn't sent by the local player.")
+	end
+
+	local arguments = Util.SplitString(text)
+	local commandName = table.remove(arguments, 1)
+	local commandObject = self.Registry:GetCommand(commandName)
+
+	if commandObject then
+		-- No need to continue splitting when there are no more arguments. We'll just mash any additional arguments into the last one.
+		arguments = Util.MashExcessArguments(arguments, #commandObject.Args)
+
+		-- Create the CommandContext and parse it.
+		local command = Command.new({
+			Dispatcher = self,
+			Text = text,
+			CommandObject = commandObject,
+			Alias = commandName,
+			Executor = executor,
+			Arguments = arguments,
+			Data = data
+		})
+		local success, errorText = command:Parse(allowIncompleteArguments)
+
+		if success then
+			return command
+		else
+			return false, errorText
+		end
+	else
+		return false, ("%q is not a valid command name. Use the help command to see all available commands."):format(tostring(commandName))
+	end
+end
+
+--- A helper that evaluates and runs the command in one go.
+-- Either returns any validation errors as a string, or the output of the command as a string. Definitely a string, though.
+function Dispatcher:EvaluateAndRun (text, executor, options)
+	executor = executor or Players.LocalPlayer
+	options = options or {}
+
+	if RunService:IsClient() and options.IsHuman then
+		self:PushHistory(text)
+	end
+
+	local command, errorText = self:Evaluate(text, executor, nil, options.Data)
+
+	if not command then
+		return errorText
+	end
+
+	local ok, out = xpcall(function()
+		local valid, errorText = command:Validate(true) -- luacheck: ignore
+
+		if not valid then
+			return errorText
+		end
+
+		return command:Run() or "Command executed."
+	end, function(value)
+		return debug.traceback(tostring(value))
+	end)
+
+	if not ok then
+		warn(("Error occurred while evaluating command string %q\n%s"):format(text, tostring(out)))
+	end
+
+	return ok and out or "An error occurred while running this command. Check the console for more information."
+end
+
+--- Send text as the local user to remote server to be evaluated there.
+function Dispatcher:Send (text, data)
+	if RunService:IsClient() == false then
+		error("Dispatcher:Send can only be called from the client.")
+	end
+
+	return self.Cmdr.RemoteFunction:InvokeServer(text, {
+		Data = data
+	})
+end
+
+--- Invoke a command programmatically as the local user e.g. from a settings menu
+-- Command should be the first argument, all arguments afterwards should be the arguments to the command.
+function Dispatcher:Run (...)
+	if not Players.LocalPlayer then
+		error("Dispatcher:Run can only be called from the client.")
+	end
+
+	local args = {...}
+	local text = args[1]
+
+	for i = 2, #args do
+		text = text .. " " .. tostring(args[i])
+	end
+
+	local command, errorText = self:Evaluate(text, Players.LocalPlayer)
+
+	if not command then
+		error(errorText) -- We do a full-on error here since this is code-invoked and they should know better.
+	end
+
+	local success, errorText = command:Validate(true) -- luacheck: ignore
+
+	if not success then
+		error(errorText)
+	end
+
+	return command:Run()
+end
+
+--- Runs hooks matching name and returns nil for ok or a string for cancellation
+function Dispatcher:RunHooks(hookName, commandContext, ...)
+	if not self.Registry.Hooks[hookName] then
+		error(("Invalid hook name: %q"):format(hookName), 2)
+	end
+
+	if
+		hookName == "BeforeRun"
+		and #self.Registry.Hooks[hookName] == 0
+		and commandContext.Group ~= "DefaultUtil"
+		and commandContext.Group ~= "UserAlias"
+		and commandContext:HasImplementation()
+	then
+
+		if RunService:IsStudio() then
+			if displayedBeforeRunHookWarning == false then
+				commandContext:Reply((RunService:IsServer() and "<Server>" or "<Client>") .. " Commands will not run in-game if no BeforeRun hook is configured. Learn more: https://eryn.io/Cmdr/guide/Hooks.html", Color3.fromRGB(255,228,26))
+				displayedBeforeRunHookWarning = true
+			end
+		else
+			return "Command blocked for security as no BeforeRun hook is configured."
+		end
+	end
+
+	for _, hook in ipairs(self.Registry.Hooks[hookName]) do
+		local value = hook.callback(commandContext, ...)
+
+		if value ~= nil then
+			return tostring(value)
+		end
+	end
+end
+
+function Dispatcher:PushHistory(text)
+	assert(RunService:IsClient(), "PushHistory may only be used from the client.")
+
+	local history = self:GetHistory()
+
+	-- Remove duplicates
+	if Util.TrimString(text) == "" or text == history[#history] then
+		return
+	end
+
+	history[#history + 1] = text
+
+	TeleportService:SetTeleportSetting(HISTORY_SETTING_NAME, history)
+end
+
+function Dispatcher:GetHistory()
+	assert(RunService:IsClient(), "GetHistory may only be used from the client.")
+
+	return TeleportService:GetTeleportSetting(HISTORY_SETTING_NAME) or {}
+end
+
+return function (cmdr)
+	Dispatcher.Cmdr = cmdr
+	Dispatcher.Registry = cmdr.Registry
+
+	return Dispatcher
+end]]></ProtectedString>
+					<string name="ScriptGuid">{EF64F973-1474-44F0-8AEC-7C6EFA1FDA08}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Dispatcher</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBXC1D5AD9D4A944F94A1ED738823D48D8F">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local RunService = game:GetService("RunService")
+
+local Util = require(script.Parent.Util)
+
+--- The registry keeps track of all the commands and types that Cmdr knows about.
+local Registry = {
+	TypeMethods = Util.MakeDictionary({"Transform", "Validate", "Autocomplete", "Parse", "DisplayName", "Listable", "ValidateOnce", "Prefixes", "Default", "ArgumentOperatorAliases"});
+	CommandMethods = Util.MakeDictionary({"Name", "Aliases", "AutoExec", "Description", "Args", "Run", "ClientRun", "Data", "Group"});
+	CommandArgProps = Util.MakeDictionary({"Name", "Type", "Description", "Optional", "Default"});
+	Types = {};
+	TypeAliases = {};
+	Commands = {};
+	CommandsArray = {};
+	Cmdr = nil;
+	Hooks = {
+		BeforeRun = {};
+		AfterRun = {}
+	};
+	Stores = setmetatable({}, {
+		__index = function (self, k)
+			self[k] = {}
+			return self[k]
+		end
+	});
+	AutoExecBuffer = {};
+}
+
+--- Registers a type in the system.
+-- name: The type Name. This must be unique.
+function Registry:RegisterType (name, typeObject)
+	if not name or typeof(name) ~= "string" then
+		error("Invalid type name provided: nil")
+	end
+
+	if not name:find("^[%d%l]%w*$") then
+		error(('Invalid type name provided: "%s", type names must be alphanumeric and start with a lower-case letter or a digit.'):format(name))
+	end
+
+	for key in pairs(typeObject) do
+		if self.TypeMethods[key] == nil then
+			error("Unknown key/method in type \"" .. name .. "\": " .. key)
+		end
+	end
+
+	if self.Types[name] ~= nil then
+		error(('Type "%s" has already been registered.'):format(name))
+	end
+
+	typeObject.Name = name
+	typeObject.DisplayName = typeObject.DisplayName or name
+
+	self.Types[name] = typeObject
+
+	if typeObject.Prefixes then
+		self:RegisterTypePrefix(name, typeObject.Prefixes)
+	end
+end
+
+function Registry:RegisterTypePrefix (name, union)
+	if not self.TypeAliases[name] then
+		self.TypeAliases[name] = name
+	end
+
+	self.TypeAliases[name] = ("%s %s"):format(self.TypeAliases[name], union)
+end
+
+function Registry:RegisterTypeAlias (name, alias)
+	assert(self.TypeAliases[name] == nil, ("Type alias %s already exists!"):format(alias))
+	self.TypeAliases[name] = alias
+end
+
+--- Helper method that registers types from all module scripts in a specific container.
+function Registry:RegisterTypesIn (container)
+	for _, object in pairs(container:GetChildren()) do
+		if object:IsA("ModuleScript") then
+			object.Parent = self.Cmdr.ReplicatedRoot.Types
+
+			require(object)(self)
+		else
+			self:RegisterTypesIn(object)
+		end
+	end
+end
+
+-- These are exactly the same thing. No one will notice. Except for you, dear reader.
+Registry.RegisterHooksIn = Registry.RegisterTypesIn
+
+--- Registers a command based purely on its definition.
+-- Prefer using Registry:RegisterCommand for proper handling of server/client model.
+function Registry:RegisterCommandObject (commandObject, fromCmdr)
+	for key in pairs(commandObject) do
+		if self.CommandMethods[key] == nil then
+			error("Unknown key/method in command " .. (commandObject.Name or "unknown command") .. ": " .. key)
+		end
+	end
+
+	if commandObject.Args then
+		for i, arg in pairs(commandObject.Args) do
+			if type(arg) == "table" then
+				for key in pairs(arg) do
+					if self.CommandArgProps[key] == nil then
+						error(('Unknown property in command "%s" argument #%d: %s'):format(commandObject.Name or "unknown", i, key))
+					end
+				end
+			end
+		end
+	end
+
+	if commandObject.AutoExec and RunService:IsClient() then
+		table.insert(self.AutoExecBuffer, commandObject.AutoExec)
+		self:FlushAutoExecBufferDeferred()
+	end
+
+	-- Unregister the old command if it exists...
+	local oldCommand = self.Commands[commandObject.Name:lower()]
+	if oldCommand and oldCommand.Aliases then
+		for _, alias in pairs(oldCommand.Aliases) do
+			self.Commands[alias:lower()] = nil
+		end
+	elseif not oldCommand then
+		table.insert(self.CommandsArray, commandObject)
+	end
+
+	self.Commands[commandObject.Name:lower()] = commandObject
+
+	if commandObject.Aliases then
+		for _, alias in pairs(commandObject.Aliases) do
+			self.Commands[alias:lower()] = commandObject
+		end
+	end
+end
+
+--- Registers a command definition and its server equivalent.
+-- Handles replicating the definition to the client.
+function Registry:RegisterCommand (commandScript, commandServerScript, filter)
+	local commandObject = require(commandScript)
+	assert(
+		typeof(commandObject) == "table",
+		`Invalid return value from command script "{commandScript.Name}" (CommandDefinition expected, got {typeof(commandObject)})`
+	)
+
+	if commandServerScript then
+		assert(RunService:IsServer(), "The commandServerScript parameter is not valid for client usage.")
+		commandObject.Run = require(commandServerScript)
+	end
+
+	if filter and not filter(commandObject) then
+		return
+	end
+
+	self:RegisterCommandObject(commandObject)
+
+	commandScript.Parent = self.Cmdr.ReplicatedRoot.Commands
+end
+
+--- A helper method that registers all commands inside a specific container.
+function Registry:RegisterCommandsIn (container, filter)
+	local skippedServerScripts = {}
+	local usedServerScripts = {}
+
+	for _, commandScript in pairs(container:GetChildren()) do
+		if commandScript:IsA("ModuleScript") then
+			if not commandScript.Name:find("Server") then
+				local serverCommandScript = container:FindFirstChild(commandScript.Name .. "Server")
+
+				if serverCommandScript then
+					usedServerScripts[serverCommandScript] = true
+				end
+
+				self:RegisterCommand(commandScript, serverCommandScript, filter)
+			else
+				skippedServerScripts[commandScript] = true
+			end
+		else
+			self:RegisterCommandsIn(commandScript, filter)
+		end
+	end
+
+	for skippedScript in pairs(skippedServerScripts) do
+		if not usedServerScripts[skippedScript] then
+			warn("Command script " .. skippedScript.Name .. " was skipped because it has 'Server' in its name, and has no equivalent shared script.")
+		end
+	end
+end
+
+--- Registers the default commands, with an optional filter function or array of groups.
+function Registry:RegisterDefaultCommands (arrayOrFunc)
+	assert(RunService:IsServer(), "RegisterDefaultCommands cannot be called from the client.")
+
+	local isArray = type(arrayOrFunc) == "table"
+
+	if isArray then
+		arrayOrFunc = Util.MakeDictionary(arrayOrFunc)
+	end
+
+	self:RegisterCommandsIn(self.Cmdr.DefaultCommandsFolder, isArray and function (command)
+		return arrayOrFunc[command.Group] or false
+	end or arrayOrFunc)
+end
+
+--- Gets a command definition by name. (Can be an alias)
+function Registry:GetCommand (name)
+	name = name or ""
+	return self.Commands[name:lower()]
+end
+
+--- Returns a unique array of all registered commands (not including aliases)
+function Registry:GetCommands ()
+	return self.CommandsArray
+end
+
+--- Returns an array of the names of all registered commands (not including aliases)
+function Registry:GetCommandNames ()
+	local commands = {}
+
+	for _, command in pairs(self.CommandsArray) do
+		table.insert(commands, command.Name)
+	end
+
+	return commands
+end
+
+Registry.GetCommandsAsStrings = Registry.GetCommandNames
+
+--- Returns an array of the names of all registered types (not including aliases)
+function Registry:GetTypeNames ()
+	local typeNames = {}
+
+	for typeName in pairs(self.Types) do
+		table.insert(typeNames, typeName)
+	end
+
+	return typeNames
+end
+
+
+--- Gets a type definition by name.
+function Registry:GetType (name)
+	return self.Types[name]
+end
+
+--- Returns a type name, parsing aliases.
+function Registry:GetTypeName (name)
+	return self.TypeAliases[name] or name
+end
+
+--- Adds a hook to be called when any command is run
+function Registry:RegisterHook(hookName, callback, priority)
+	if not self.Hooks[hookName] then
+		error(("Invalid hook name: %q"):format(hookName), 2)
+	end
+
+	table.insert(self.Hooks[hookName], { callback = callback; priority = priority or 0; } )
+	table.sort(self.Hooks[hookName], function(a, b) return a.priority < b.priority end)
+end
+
+-- Backwards compatability (deprecated)
+Registry.AddHook = Registry.RegisterHook
+
+--- Returns the store with the given name
+-- Used for commands that require persistent state, like bind or ban
+function Registry:GetStore(name)
+	return self.Stores[name]
+end
+
+--- Calls self:FlushAutoExecBuffer at the end of the frame
+function Registry:FlushAutoExecBufferDeferred()
+	if self.AutoExecFlushConnection then
+		return
+	end
+
+	self.AutoExecFlushConnection = RunService.Heartbeat:Connect(function()
+		self.AutoExecFlushConnection:Disconnect()
+		self.AutoExecFlushConnection = nil
+		self:FlushAutoExecBuffer()
+	end)
+end
+
+--- Runs all pending auto exec commands in Registry.AutoExecBuffer
+function Registry:FlushAutoExecBuffer()
+	for _, commandGroup in ipairs(self.AutoExecBuffer) do
+		for _, command in ipairs(commandGroup) do
+			self.Cmdr.Dispatcher:EvaluateAndRun(command)
+		end
+	end
+
+	self.AutoExecBuffer = {}
+end
+
+return function (cmdr)
+	Registry.Cmdr = cmdr
+
+	return Registry
+end
+]]></ProtectedString>
+					<string name="ScriptGuid">{AB8EDA63-5286-438D-BD1D-72789E87E48B}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Registry</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX61F17F19B9694D01A587E839D8E05AD4">
+				<Properties>
+					<Content name="LinkedSource"><null></null></Content>
+					<ProtectedString name="Source"><![CDATA[local TextService = game:GetService("TextService")
+
+local Util = {}
+
+--- Takes an array and flips its values into dictionary keys with value of true.
+function Util.MakeDictionary(array)
+	local dictionary = {}
+
+	for i = 1, #array do
+		dictionary[array[i]] = true
+	end
+
+	return dictionary
+end
+
+--- Takes a dictionary and returns its keys.
+function Util.DictionaryKeys(dict)
+	local keys = {}
+
+	for key in pairs(dict) do
+		table.insert(keys, key)
+	end
+
+	return keys
+end
+
+-- Takes an array of instances and returns (array<names>, array<instances>)
+local function transformInstanceSet(instances)
+	local names = {}
+
+	for i = 1, #instances do
+		names[i] = instances[i].Name
+	end
+
+	return names, instances
+end
+
+--- Returns a function that is a fuzzy finder for the specified set or container.
+-- Can pass an array of strings, array of instances, array of EnumItems,
+-- array of dictionaries with a Name key or an instance (in which case its children will be used)
+-- Exact matches will be inserted in the front of the resulting array
+function Util.MakeFuzzyFinder(setOrContainer)
+	local names
+	local instances = {}
+
+	if typeof(setOrContainer) == "Enum" then
+		setOrContainer = setOrContainer:GetEnumItems()
+	end
+
+	if typeof(setOrContainer) == "Instance" then
+		names, instances = transformInstanceSet(setOrContainer:GetChildren())
+	elseif typeof(setOrContainer) == "table" then
+		if
+			typeof(setOrContainer[1]) == "Instance" or typeof(setOrContainer[1]) == "EnumItem" or
+				(typeof(setOrContainer[1]) == "table" and typeof(setOrContainer[1].Name) == "string")
+		 then
+			names, instances = transformInstanceSet(setOrContainer)
+		elseif type(setOrContainer[1]) == "string" then
+			names = setOrContainer
+		elseif setOrContainer[1] ~= nil then
+			error("MakeFuzzyFinder only accepts tables of instances or strings.")
+		else
+			names = {}
+		end
+	else
+		error("MakeFuzzyFinder only accepts a table, Enum, or Instance.")
+	end
+
+	-- Searches the set (checking exact matches first)
+	return function(text, returnFirst)
+		local results = {}
+
+		for i, name in pairs(names) do
+			local value = instances and instances[i] or name
+
+			-- Continue on checking for non-exact matches...
+			-- Still need to loop through everything, even on returnFirst, because possibility of an exact match.
+			if name:lower() == text:lower() then
+				if returnFirst then
+					return value
+				else
+					table.insert(results, 1, value)
+				end
+			elseif name:lower():find(text:lower(), 1, true) then
+				results[#results + 1] = value
+			end
+		end
+
+		if returnFirst then
+			return results[1]
+		end
+
+		return results
+	end
+end
+
+--- Takes an array of instances and returns an array of those instances' names.
+function Util.GetNames(instances)
+	local names = {}
+
+	for i = 1, #instances do
+		names[i] = instances[i].Name or tostring(instances[i])
+	end
+
+	return names
+end
+
+--- Splits a string using a simple separator (no quote parsing)
+function Util.SplitStringSimple(inputstr, sep)
+	if sep == nil then
+		sep = "%s"
+	end
+	local t = {}
+	local i = 1
+	for str in string.gmatch(inputstr, "([^" .. sep .. "]+)") do
+		t[i] = str
+		i = i + 1
+	end
+	return t
+end
+
+local function charCode(n)
+	return utf8.char(tonumber(n, 16))
+end
+
+--- Parses escape sequences into their fully qualified characters
+function Util.ParseEscapeSequences(text)
+	return text:gsub("\\(.)", {
+		t = "\t";
+		n = "\n";
+	})
+	:gsub("\\u(%x%x%x%x)", charCode)
+	:gsub("\\x(%x%x)", charCode)
+end
+
+function Util.EncodeEscapedOperator(text, op)
+	local first = op:sub(1, 1)
+	local escapedOp = op:gsub(".", "%%%1")
+	local escapedFirst = "%" .. first
+
+	return text:gsub("(" .. escapedFirst .. "+)(" .. escapedOp .. ")", function(esc, op)
+			return (esc:sub(1, #esc-1) .. op):gsub(".", function(char)
+					return "\\u" .. string.format("%04x", string.byte(char), 16)
+			end)
+	end)
+end
+
+local OPERATORS = {"&&", "||", ";"}
+function Util.EncodeEscapedOperators(text)
+	for _, operator in ipairs(OPERATORS) do
+		text = Util.EncodeEscapedOperator(text, operator)
+	end
+
+	return text
+end
+
+local function encodeControlChars(text)
+	return (
+		text
+		:gsub("\\\\", "___!CMDR_ESCAPE!___")
+		:gsub("\\\"", "___!CMDR_QUOTE!___")
+		:gsub("\\'", "___!CMDR_SQUOTE!___")
+		:gsub("\\\n", "___!CMDR_NL!___")
+	)
+end
+
+local function decodeControlChars(text)
+	return (
+		text
+		:gsub("___!CMDR_ESCAPE!___", "\\")
+		:gsub("___!CMDR_QUOTE!___", "\"")
+		:gsub("___!CMDR_NL!___", "\n")
+	)
+end
+
+--- Splits a string by space but taking into account quoted sequences which will be treated as a single argument.
+function Util.SplitString(text, max)
+	text = encodeControlChars(text)
+	max = max or math.huge
+	local t = {}
+	local spat, epat = [=[^(['"])]=], [=[(['"])$]=]
+	local buf, quoted
+	for str in text:gmatch("[^ ]+") do
+		str = Util.ParseEscapeSequences(str)
+		local squoted = str:match(spat)
+		local equoted = str:match(epat)
+		local escaped = str:match([=[(\*)['"]$]=])
+		if squoted and not quoted and not equoted then
+			buf, quoted = str, squoted
+		elseif buf and equoted == quoted and #escaped % 2 == 0 then
+			str, buf, quoted = buf .. " " .. str, nil, nil
+		elseif buf then
+			buf = buf .. " " .. str
+		end
+		if not buf then
+			t[#t + (#t > max and 0 or 1)] = decodeControlChars(str:gsub(spat, ""):gsub(epat, ""))
+		end
+	end
+
+	if buf then
+		t[#t + (#t > max and 0 or 1)] = decodeControlChars(buf)
+	end
+
+	return t
+end
+
+--- Takes an array of arguments and a max value.
+-- Any indicies past the max value will be appended to the last valid argument.
+function Util.MashExcessArguments(arguments, max)
+	local t = {}
+	for i = 1, #arguments do
+		if i > max then
+			t[max] = ("%s %s"):format(t[max] or "", arguments[i])
+		else
+			t[i] = arguments[i]
+		end
+	end
+	return t
+end
+
+--- Trims whitespace from both sides of a string.
+function Util.TrimString(str)
+	local _, from = string.find(str, "^%s*")
+	-- trim the string in two steps to prevent quadratic backtracking when no "%S" match is found
+	return from == #str and "" or string.match(str, ".*%S", from + 1)
+end
+
+--- Returns the text bounds size based on given text, label (from which properties will be pulled), and optional Vector2 container size.
+function Util.GetTextSize(text, label, size)
+	return TextService:GetTextSize(text, label.TextSize, label.Font, size or Vector2.new(label.AbsoluteSize.X, 0))
+end
+
+--- Makes an Enum type.
+function Util.MakeEnumType(name, values)
+	local findValue = Util.MakeFuzzyFinder(values)
+	return {
+		Validate = function(text)
+			return findValue(text, true) ~= nil, ("Value %q is not a valid %s."):format(text, name)
+		end,
+		Autocomplete = function(text)
+			local list = findValue(text)
+			return type(list[1]) ~= "string" and Util.GetNames(list) or list
+		end,
+		Parse = function(text)
+			return findValue(text, true)
+		end
+	}
+end
+
+--- Parses a prefixed union type argument (such as %Team)
+function Util.ParsePrefixedUnionType(typeValue, rawValue)
+	local split = Util.SplitStringSimple(typeValue)
+
+	-- Check prefixes in order from longest to shortest
+	local types = {}
+	for i = 1, #split, 2 do
+		types[#types + 1] = {
+			prefix = split[i - 1] or "",
+			type = split[i]
+		}
+	end
+
+	table.sort(
+		types,
+		function(a, b)
+			return #a.prefix > #b.prefix
+		end
+	)
+
+	for i = 1, #types do
+		local t = types[i]
+
+		if rawValue:sub(1, #t.prefix) == t.prefix then
+			return t.type, rawValue:sub(#t.prefix + 1), t.prefix
+		end
+	end
+end
+
+--- Creates a listable type from a singlular type
+function Util.MakeListableType(type, override)
+	local listableType = {
+		Listable = true,
+		Transform = type.Transform,
+		Validate = type.Validate,
+		ValidateOnce = type.ValidateOnce,
+		Autocomplete = type.Autocomplete,
+		Default = type.Default,
+		ArgumentOperatorAliases = type.ArgumentOperatorAliases,
+		Parse = function(...)
+			return {type.Parse(...)}
+		end
+	}
+
+	if override then
+		for key, value in pairs(override) do
+			listableType[key] = value
+		end
+	end
+
+	return listableType
+end
+
+local function encodeCommandEscape(text)
+	return (text:gsub("\\%$", "___!CMDR_DOLLAR!___"))
+end
+
+local function decodeCommandEscape(text)
+	return (text:gsub("___!CMDR_DOLLAR!___", "$"))
+end
+
+function Util.RunCommandString(dispatcher, commandString)
+	commandString = Util.ParseEscapeSequences(commandString)
+	commandString = Util.EncodeEscapedOperators(commandString)
+
+	local commands = commandString:split("&&")
+
+	local output = ""
+	for i, command in ipairs(commands) do
+		local outputEncoded = output:gsub("%$", "\\x24"):gsub("%%","%%%%")
+		command = command:gsub("||", output:find("%s") and ("%q"):format(outputEncoded) or outputEncoded)
+
+		output = tostring(
+			dispatcher:EvaluateAndRun(
+				(
+					Util.RunEmbeddedCommands(dispatcher, command)
+				)
+			)
+		)
+
+
+		if i == #commands then
+			return output
+		end
+	end
+end
+
+--- Runs embedded commands and replaces them
+function Util.RunEmbeddedCommands(dispatcher, str)
+	str = encodeCommandEscape(str)
+
+	local results = {}
+	-- We need to do this because you can't yield in the gsub function
+	for text in str:gmatch("$(%b{})") do
+		local doQuotes = true
+		local commandString = text:sub(2, #text-1)
+
+		if commandString:match("^{.+}$") then -- Allow double curly for literal replacement
+			doQuotes = false
+			commandString = commandString:sub(2, #commandString-1)
+		end
+
+		results[text] = Util.RunCommandString(dispatcher, commandString)
+
+		if doQuotes then
+			if results[text]:find("%s") or results[text] == "" then
+				results[text] = string.format("%q", results[text])
+			end
+		end
+	end
+
+	return decodeCommandEscape(str:gsub("$(%b{})", results))
+end
+
+--- Replaces arguments in the format $1, $2, $something with whatever the
+-- given function returns for it.
+function Util.SubstituteArgs(str, replace)
+	str = encodeCommandEscape(str)
+	-- Convert numerical keys to strings
+	if type(replace) == "table" then
+		for i = 1, #replace do
+			local k = tostring(i)
+			replace[k] = replace[i]
+
+			if replace[k]:find("%s") then
+				replace[k] = string.format("%q", replace[k])
+			end
+		end
+	end
+	return decodeCommandEscape(str:gsub("($%d+)%b{}", "%1"):gsub("$(%w+)", replace))
+end
+
+--- Creates an alias command
+function Util.MakeAliasCommand(name, commandString)
+	local commandName, commandDescription = unpack(name:split("|"))
+	local args = {}
+
+	commandString = Util.EncodeEscapedOperators(commandString)
+
+	local seenArgs = {}
+
+	for arg in commandString:gmatch("$(%d+)") do
+		if seenArgs[arg] == nil then
+			seenArgs[arg] = true
+			local options = commandString:match(`${arg}(%b\{})`)
+
+			local argOptional, argType, argName, argDescription
+			if options then
+				options = options:sub(2, #options - 1) -- remove braces
+				argType, argName, argDescription = unpack(options:split("|"))
+			end
+
+			argOptional = argType and not not argType:match("%?$")
+			argType = if argType then argType:match("^%w+") else "string"
+			argName = argName or `Argument {arg}`
+			argDescription = argDescription or ""
+
+			table.insert(args, {
+				Type = argType,
+				Name = argName,
+				Description = argDescription,
+				Optional = argOptional,
+			})
+		end
+	end
+
+	return {
+		Name = commandName,
+		Aliases = {},
+		Description = `<Alias> {commandDescription or commandString}`,
+		Group = "UserAlias",
+		Args = args,
+		Run = function(context)
+			return Util.RunCommandString(context.Dispatcher, Util.SubstituteArgs(commandString, context.RawArguments))
+		end,
+	}
+end
+
+--- Makes a type that contains a sequence, e.g. Vector3 or Color3
+function Util.MakeSequenceType(options)
+	options = options or {}
+
+	assert(options.Parse ~= nil or options.Constructor ~= nil, "MakeSequenceType: Must provide one of: Constructor, Parse")
+
+	options.TransformEach = options.TransformEach or function(...)
+		return ...
+	end
+
+	options.ValidateEach = options.ValidateEach or function()
+		return true
+	end
+
+	return {
+		Prefixes = options.Prefixes;
+
+		Transform = function (text)
+			return Util.Map(Util.SplitPrioritizedDelimeter(text, {",", "%s"}), function(value)
+				return options.TransformEach(value)
+			end)
+		end;
+
+		Validate = function (components)
+			if options.Length and #components > options.Length then
+				return false, ("Maximum of %d values allowed in sequence"):format(options.Length)
+			end
+
+			for i = 1, options.Length or #components do
+				local valid, reason = options.ValidateEach(components[i], i)
+
+				if not valid then
+					return false, reason
+				end
+			end
+
+			return true
+		end;
+
+		Parse = options.Parse or function(components)
+			return options.Constructor(unpack(components))
+		end
+	}
+end
+
+--- Splits a string by a single delimeter chosen from the given set.
+-- The first matching delimeter from the set becomes the split character.
+function Util.SplitPrioritizedDelimeter(text, delimeters)
+	for i, delimeter in ipairs(delimeters) do
+		if text:find(delimeter) or i == #delimeters then
+			return Util.SplitStringSimple(text, delimeter)
+		end
+	end
+end
+
+--- Maps values of an array through a callback and returns an array of mapped values
+function Util.Map(array, callback)
+	local results = {}
+
+	for i, v in ipairs(array) do
+		results[i] = callback(v, i)
+	end
+
+	return results
+end
+
+--- Maps arguments #2-n through callback and returns values as tuple
+function Util.Each(callback, ...)
+	local results = {}
+	for i, value in ipairs({...}) do
+		results[i] = callback(value)
+	end
+	return unpack(results)
+end
+
+--- Emulates tabstops with spaces
+function Util.EmulateTabstops(text, tabWidth)
+	local column = 0
+	local textLength = #text
+	local result = table.create(textLength)
+	for i = 1, textLength do
+		local char = string.sub(text, i, i)
+		if char == "\t" then
+			local spaces = tabWidth - column % tabWidth
+			table.insert(result, string.rep(" ", spaces))
+			column += spaces
+		else
+			table.insert(result, char)
+			if char == "\n" then
+				column = 0 -- Reset column counter on newlines
+			elseif char ~= "\r" then
+				column += 1
+			end
+		end
+	end
+	return table.concat(result)
+end
+
+function Util.Mutex()
+	local queue = {}
+	local locked = false
+
+	return function ()
+		if locked then
+			table.insert(queue, coroutine.running())
+			coroutine.yield()
+		else
+			locked = true
+		end
+
+		return function()
+			if #queue > 0 then
+				coroutine.resume(table.remove(queue, 1))
+			else
+				locked = false
+			end
+		end
+	end
+end
+
+return Util
+]]></ProtectedString>
+					<string name="ScriptGuid">{628E067C-56CC-475A-B183-FF820B72789C}</string>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">Util</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+			</Item>
+		</Item>
+	</Item>
+</roblox>

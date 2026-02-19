@@ -4,6 +4,8 @@ local RS = game:GetService("ReplicatedStorage")
 local GripService = {}
 GripService.__index = GripService
 
+local DEFAULT_VISUAL_RADIUS = 180
+
 local function getWeaponName(character)
 	local tool = character and character:FindFirstChildOfClass("Tool")
 	if not tool then
@@ -56,9 +58,33 @@ function GripService.new(deps)
 	self.TargetLock = deps.TargetLock
 	self.Maid = deps.Maid
 	self.AssetsRoot = deps.AssetsRoot or RS
+	self.CombatReplication = deps.CombatReplication
 
 	self._active = {} -- [player] = { cancel = fn }
 	return self
+end
+
+function GripService:_replicateHitVfx(
+	carrierCharacter: Model,
+	targetCharacter: Model,
+	payload: any,
+	includePlayers: { Player }?
+)
+	if self.CombatReplication and typeof(self.CombatReplication.FireClientsNear) == "function" then
+		local radius = math.max(0, tonumber(self.Config.VisualReplicationRadius) or DEFAULT_VISUAL_RADIUS)
+		self.CombatReplication.FireClientsNear(
+			self.Replication,
+			"Weaponary",
+			"Hit",
+			payload,
+			{ carrierCharacter, targetCharacter },
+			radius,
+			includePlayers
+		)
+		return
+	end
+
+	self.Replication:FireAllClients("Weaponary", "Hit", payload)
 end
 
 function GripService:_start(player, prompt)
@@ -232,7 +258,11 @@ function GripService:_start(player, prompt)
 	end
 
 	self.SoundUtil.PlayNatural(self.AssetsRoot, "Execute", carrierRoot)
-	self.Replication:FireAllClients("Global", "Hit", { targetChar, { 4, "Human" } })
+	local includePlayers = { player }
+	if targetPlayer then
+		table.insert(includePlayers, targetPlayer)
+	end
+	self:_replicateHitVfx(carrierChar, targetChar, { targetChar, { 4, "Human" } }, includePlayers)
 
 	targetHum:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
 	if targetHum.Health > 0 then

@@ -8,15 +8,15 @@ function module.Init(context)
 	local script = context and context.script or error("missing script context")
 	local root = context and context.root or script.Parent
 	if not game:IsLoaded() then game.Loaded:Wait() end
-	
-	if not game:IsLoaded() then game.Loaded:Wait() end
-	
+
 	local RS = game:GetService("ReplicatedStorage")
 	local uis = game:GetService("UserInputService")
 	local TS = game:GetService("TweenService")
 	local RunService = game:GetService("RunService")
 	local ContentProvider = game:GetService("ContentProvider")
 	local CollectionService = game:GetService("CollectionService")
+	local StateManager = require(RS:WaitForChild("Modules"):WaitForChild("Shared"):WaitForChild("StateManager"))
+	local StateKeys = require(RS:WaitForChild("Modules"):WaitForChild("Shared"):WaitForChild("StateKeys"))
 	
 	-- Events
 	local CooldownRetriever = RS:WaitForChild("Remotes"):WaitForChild("CooldownRetriever")
@@ -82,6 +82,7 @@ function module.Init(context)
 	local isUIVisible = false
 	local toolSlotLookup = {}
 	local tooltipConnections = {}
+	local weaponFlagConns = {}
 	local draggedItems = {}
 	local guiSlots = {}
 	local knownTools = {}
@@ -258,11 +259,17 @@ function module.Init(context)
 		rubiValue.Changed:Connect(updateMoneyUI)
 	end
 	
+	local previewViewport = InventoryUI.ItemPreviewFrame.Viewport
 	local viewportCamera = Instance.new("Camera")
 	viewportCamera.CFrame = CFrame.new()
 	viewportCamera.FieldOfView = 18
-	viewportCamera.Parent = InventoryUI.ItemPreviewFrame.Viewport
-	InventoryUI.ItemPreviewFrame.Viewport.CurrentCamera = viewportCamera
+	viewportCamera.Parent = previewViewport
+	previewViewport.CurrentCamera = viewportCamera
+
+	local previewItemsFolder = Instance.new("Folder")
+	previewItemsFolder.Name = "PreviewItems"
+	previewItemsFolder.Parent = previewViewport
+	local previewSpinConn: RBXScriptConnection? = nil
 	
 	-- Keys
 	local inputKeys = {
@@ -520,7 +527,61 @@ function module.Init(context)
 			tooltipConnections[slot] = nil
 		end
 	end
-	
+
+	local function clearPreviewViewport()
+		if previewSpinConn then
+			previewSpinConn:Disconnect()
+			previewSpinConn = nil
+		end
+
+		for _, child in ipairs(previewItemsFolder:GetChildren()) do
+			child:Destroy()
+		end
+
+		viewportCamera.CameraSubject = nil
+	end
+
+	local function setPreviewPivot(instance: Instance, targetCFrame: CFrame)
+		local ok = pcall(function()
+			instance:PivotTo(targetCFrame)
+		end)
+		if ok then
+			return
+		end
+
+		local handle = instance:FindFirstChild("Handle", true)
+		if handle and handle:IsA("BasePart") then
+			handle.CFrame = targetCFrame
+		end
+	end
+
+	local function resolvePreviewSubject(instance: Instance): Instance?
+		if instance:IsA("BasePart") then
+			return instance
+		end
+
+		local humanoid = instance:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			return humanoid
+		end
+
+		if instance:IsA("Model") and instance.PrimaryPart then
+			return instance.PrimaryPart
+		end
+
+		local handle = instance:FindFirstChild("Handle", true)
+		if handle and handle:IsA("BasePart") then
+			return handle
+		end
+
+		local firstPart = instance:FindFirstChildWhichIsA("BasePart", true)
+		if firstPart then
+			return firstPart
+		end
+
+		return nil
+	end
+
 	local function showTooltip(tool, guiSlot)
 		if not tool or dragging then return end
 	
@@ -540,7 +601,7 @@ function module.Init(context)
 	
 		-- Si c'est une arme, utiliser WeaponInfo
 		if typeAttr == "Attack" then
-			local weaponInfo = RS.Remotes.GetWeaponInfo:InvokeServer("Weapon", tool.Name)
+			local weaponInfo = GetWeaponInfo:InvokeServer("Weapon", tool.Name)
 			if weaponInfo then
 				local Description = weaponInfo.Description
 				local damage = weaponInfo.Damage or "?"
@@ -553,7 +614,7 @@ function module.Init(context)
 				ToolTip.TipLabel.Text = tool:GetAttribute("Description") or "No description"
 			end
 		elseif typeAttr == "Equip" then
-			local weaponInfo = RS.Remotes.GetWeaponInfo:InvokeServer("Equipment", tool.Name)
+			local weaponInfo = GetWeaponInfo:InvokeServer("Equipment", tool.Name)
 			if weaponInfo then
 				local Description = weaponInfo.Description
 				local ItemStat = tool:GetAttribute("Stats") or ""
@@ -588,27 +649,28 @@ function module.Init(context)
 			end
 		end
 	
-		local originalHandle = tool
-		if originalHandle then
-			local handle: BasePart = originalHandle:clone()
-			handle.Parent = InventoryUI.ItemPreviewFrame.Viewport
-			handle:PivotTo(CFrame.new(0, 0, -8.5))
+		clearPreviewViewport()
+		local previewItem = tool:Clone()
+		if previewItem then
+			previewItem.Parent = previewItemsFolder
+			setPreviewPivot(previewItem, CFrame.new(0, 0, -8.5))
 			InventoryUI.ItemPreviewFrame.Visible = true
-	
-			viewportCamera.CameraSubject = handle
+
+			local cameraSubject = resolvePreviewSubject(previewItem)
+			if cameraSubject then
+				viewportCamera.CameraSubject = cameraSubject
+			end
 			viewportCamera.FieldOfView = 18
-	
+
 			local accumulated = 0
-			local connection = nil
-			connection = RunService.RenderStepped:connect(function(deltaTime)
-				if (not handle or not handle.Parent) or (handle and (viewportCamera.CameraSubject ~= handle)) then
-					connection:Disconnect()
-					connection = nil
-				else
-					accumulated += deltaTime
-					handle:PivotTo(CFrame.new(Vector3.new(0, 0, -8.5)) * CFrame.Angles(0, accumulated*3, 0))
-					--print(handle:GetPivot())
+			previewSpinConn = RunService.RenderStepped:Connect(function(deltaTime)
+				if not previewItem.Parent then
+					clearPreviewViewport()
+					return
 				end
+
+				accumulated += deltaTime
+				setPreviewPivot(previewItem, CFrame.new(Vector3.new(0, 0, -8.5)) * CFrame.Angles(0, accumulated * 3, 0))
 			end)
 		end
 	
@@ -619,7 +681,7 @@ function module.Init(context)
 	local function hideTooltip()
 		ToolTip.Visible = false
 		InventoryUI.ItemPreviewFrame.Visible = false
-		InventoryUI.ItemPreviewFrame.Viewport:ClearAllChildren()
+		clearPreviewViewport()
 	end
 	
 	local function updateCapacity()
@@ -639,13 +701,63 @@ function module.Init(context)
 	end
 	
 	local function handleEquip(tool)
+		local function isSelectedAttackTool(inst)
+			return inst
+				and inst:IsA("Tool")
+				and inst:GetAttribute("Type") == "Attack"
+				and inst:FindFirstChild("EquipedWeapon") ~= nil
+		end
+
+		if not char or not char.Parent then
+			return
+		end
+		if char:GetAttribute("Downed") == true then
+			return
+		end
+		if char:GetAttribute("Gripped") == true then
+			return
+		end
+		if char:GetAttribute("Gripping") == true then
+			return
+		end
+
+		local function isMovementActionBlockingWeaponToggle()
+			if not char or not char.Parent then
+				return false
+			end
+
+			if char:GetAttribute("Carried") == true or char:GetAttribute("Carrying") == true then
+				return true
+			end
+
+			if char:GetAttribute("Dashing") == true then
+				return true
+			end
+
+			return StateManager.GetState(player, StateKeys.Sliding) == true
+				or StateManager.GetState(player, StateKeys.Dashing) == true
+				or StateManager.GetState(player, StateKeys.Climbing) == true
+				or StateManager.GetState(player, StateKeys.Vaulting) == true
+				or StateManager.GetState(player, StateKeys.WallRunning) == true
+		end
+
+		local equippedTool = char and char:FindFirstChildWhichIsA("Tool")
+		local togglingSelectedWeapon = isSelectedAttackTool(tool) or isSelectedAttackTool(equippedTool)
+		if togglingSelectedWeapon and isMovementActionBlockingWeaponToggle() then
+			return
+		end
+
 		local stunned = char:GetAttribute('Stunned')
+		local slowStunned = char:GetAttribute('SlowStunned')
 		local attacking = char:GetAttribute('Attacking')
 		local swing = char:GetAttribute('Swing')
 		local blocking = char:GetAttribute('isBlocking')
+		local parrying = char:GetAttribute('Parrying')
+		local autoParryActive = char:GetAttribute('AutoParryActive')
 		local dashing = char:GetAttribute('Dashing')
+		local equipBlocked = stunned or slowStunned or attacking or swing or blocking or parrying or autoParryActive or dashing
 	
-		if tool and tool.Parent ~= char and not (stunned or attacking or swing or blocking or dashing) then
+		if tool and tool.Parent ~= char and not equipBlocked then
 			if tool:GetAttribute('Type') == 'Ability' then
 				local currentCooldowns = CooldownRetriever:InvokeServer()
 				local abilityCooldown = tool:GetAttribute('HotbarCooldown')
@@ -658,7 +770,7 @@ function module.Init(context)
 			else
 				hum:EquipTool(tool)
 			end
-		elseif not (stunned or attacking or swing or blocking or dashing) then
+		elseif not equipBlocked then
 			hum:UnequipTools()
 		end
 	end
@@ -1093,6 +1205,25 @@ function module.Init(context)
 		
 		local toolNameAttr = adding:GetAttribute("Name")
 		local toolType = adding:GetAttribute("Type")
+
+		if toolType == "Attack" and not weaponFlagConns[adding] then
+			local conns = {}
+			local function onFlagChanged(child)
+				if child.Name ~= "EquipedWeapon" then
+					return
+				end
+				task.defer(function()
+					if adding.Parent == bp or adding.Parent == char then
+						refreshInventoryUI()
+						updateCapacity()
+					end
+				end)
+			end
+
+			table.insert(conns, adding.ChildAdded:Connect(onFlagChanged))
+			table.insert(conns, adding.ChildRemoved:Connect(onFlagChanged))
+			weaponFlagConns[adding] = conns
+		end
 	
 		for _, value in ipairs(inputOrder) do
 			if value.tool == adding then
@@ -1102,6 +1233,7 @@ function module.Init(context)
 	
 		if toolSlotLookup[adding] then
 			updateCapacity()
+			refreshInventoryUI()
 			return
 		end
 		
@@ -1125,6 +1257,16 @@ function module.Init(context)
 		if not removing:IsA("Tool") then return end
 		task.defer(function()
 			if removing.Parent == bp or removing.Parent == char then return end
+
+			local toolConns = weaponFlagConns[removing]
+			if toolConns then
+				for _, conn in ipairs(toolConns) do
+					if conn and conn.Connected then
+						conn:Disconnect()
+					end
+				end
+				weaponFlagConns[removing] = nil
+			end
 			
 			cleanupSlot(removing)
 	

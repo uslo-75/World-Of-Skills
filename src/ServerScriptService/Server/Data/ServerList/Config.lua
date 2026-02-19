@@ -11,7 +11,7 @@ return {
 	EnableMemoryStore = not RunService:IsStudio(),
 
 	GeoLookup = {
-		Url = "http://ip-api.com/json/",
+		Url = "https://ipwho.is/",
 		MaxAttempts = 5,
 		RetrySeconds = 5,
 	},

@@ -3,6 +3,24 @@ local ServerStorage = game:GetService("ServerStorage")
 local ToolFactory = {}
 ToolFactory.__index = ToolFactory
 
+local function matchesTemplateQuery(tool: Tool, query: string): boolean
+	if tool.Name == query then
+		return true
+	end
+
+	local displayName = tool:GetAttribute("Name")
+	if typeof(displayName) == "string" and displayName == query then
+		return true
+	end
+
+	local weaponName = tool:GetAttribute("Weapon")
+	if typeof(weaponName) == "string" and weaponName == query then
+		return true
+	end
+
+	return false
+end
+
 function ToolFactory.new(deps)
 	local self = setmetatable({}, ToolFactory)
 
@@ -45,8 +63,25 @@ function ToolFactory:_findTemplate(toolName: string)
 		return nil
 	end
 
+	-- Primary lookup for weapon tools (respawn/rejoin flow).
+	local weaponFolder = root:FindFirstChild("Weapon")
+	if weaponFolder and weaponFolder:IsA("Folder") then
+		local direct = weaponFolder:FindFirstChild(toolName)
+		if direct and direct:IsA("Tool") then
+			self._templateCache[toolName] = direct
+			return direct
+		end
+
+		for _, d in ipairs(weaponFolder:GetDescendants()) do
+			if d:IsA("Tool") and matchesTemplateQuery(d, toolName) then
+				self._templateCache[toolName] = d
+				return d
+			end
+		end
+	end
+
 	for _, d in ipairs(root:GetDescendants()) do
-		if d:IsA("Tool") and d.Name == toolName then
+		if d:IsA("Tool") and matchesTemplateQuery(d, toolName) then
 			self._templateCache[toolName] = d
 			return d
 		end
@@ -64,17 +99,35 @@ local function createFallbackTool(itemData)
 end
 
 function ToolFactory:ApplyAttributes(tool: Tool, itemData)
-	local displayName = itemData.name or tool.Name
+	local canonicalName = tool.Name
+	local existingDisplayName = tool:GetAttribute("Name")
+	local displayName = existingDisplayName
+	if typeof(displayName) ~= "string" or displayName == "" then
+		displayName = canonicalName
+	end
 	local statsString = self.StatsUtil.ToString(itemData.statsRaw or itemData.stats, self.DataManager)
+	local typeValue = itemData.type
+	if typeof(typeValue) ~= "string" or typeValue == "" then
+		typeValue = tool:GetAttribute("Type")
+	end
+	local rarityValue = itemData.rarity
+	if typeof(rarityValue) ~= "string" or rarityValue == "" then
+		rarityValue = tool:GetAttribute("Rarity")
+	end
+	local descriptionValue = itemData.description
+	if typeof(descriptionValue) ~= "string" or descriptionValue == "" then
+		descriptionValue = tool:GetAttribute("Description")
+	end
 
-	tool.Name = displayName
+	tool.Name = canonicalName
 	tool:SetAttribute("InventoryId", itemData.id)
 	tool:SetAttribute("Name", displayName)
+	tool:SetAttribute("TemplateName", canonicalName)
 	tool:SetAttribute("Stats", statsString)
 	tool:SetAttribute("Enchant", itemData.enchant)
-	tool:SetAttribute("Type", itemData.type)
-	tool:SetAttribute("Rarity", itemData.rarity)
-	tool:SetAttribute("Description", itemData.description)
+	tool:SetAttribute("Type", typeValue)
+	tool:SetAttribute("Rarity", rarityValue)
+	tool:SetAttribute("Description", descriptionValue)
 end
 
 function ToolFactory:CreateToolFromItem(itemData)
@@ -100,14 +153,9 @@ function ToolFactory:CreateToolFromItem(itemData)
 end
 
 function ToolFactory:SerializeTool(tool: Tool)
-	local name = tool:GetAttribute("Name")
-	if typeof(name) ~= "string" or name == "" then
-		name = tool.Name
-	end
-
 	return {
 		id = tool:GetAttribute("InventoryId"),
-		name = name,
+		name = tool.Name,
 		statsRaw = tool:GetAttribute("Stats"),
 		enchant = tool:GetAttribute("Enchant"),
 		type = tool:GetAttribute("Type"),

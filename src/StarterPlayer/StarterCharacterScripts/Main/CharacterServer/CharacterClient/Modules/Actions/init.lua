@@ -158,6 +158,7 @@ ActionsRunning.Bind(module, {
 })
 
 ActionsDash.Bind(module, {
+	StateManager = StateManager,
 	Settings = Settings,
 	RunService = RunService,
 	Main = Main,

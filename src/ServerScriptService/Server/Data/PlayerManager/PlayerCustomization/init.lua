@@ -11,6 +11,33 @@ local function hasOrnamentColors(value)
 	return type(value) == "table" and next(value) ~= nil
 end
 
+local function normalizeClothingId(rawValue)
+	if typeof(rawValue) ~= "string" then
+		return ""
+	end
+
+	local trimmed = rawValue:gsub("^%s+", ""):gsub("%s+$", "")
+	if trimmed == "" then
+		return ""
+	end
+
+	if string.lower(trimmed) == "none" then
+		return ""
+	end
+
+	local fromAssetUrl = trimmed:match("^rbxassetid://(%d+)$")
+	if fromAssetUrl then
+		return fromAssetUrl
+	end
+
+	local digitsOnly = trimmed:match("^(%d+)$")
+	if digitsOnly then
+		return digitsOnly
+	end
+
+	return ""
+end
+
 local function toColorTable(color3)
 	return {
 		r = color3.R,
@@ -102,8 +129,8 @@ function PlayerCustomization.ApplyCustomization(player, profile, characterOverri
 	local charData = profile.Data[CurrentSlot].CharData
 	local hairId = charData.Hair or "None"
 	local hairColors = charData.HairColor or { r = 1, g = 1, b = 1 }
-	local shirtId = charData.Shirt or ""
-	local pantId = charData.Pant or ""
+	local shirtId = normalizeClothingId(charData.Shirt)
+	local pantId = normalizeClothingId(charData.Pant)
 	local civilization = charData.Civilizations or "Default"
 	local head = char:FindFirstChild("Head")
 	local OverHead = char:FindFirstChild("OverHead")

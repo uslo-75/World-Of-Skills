@@ -20,9 +20,14 @@ local Config = {
 	DropGroundOffset = 0.05,
 
 	-- Net
-	RequestCooldown = 0.25, -- anti spam requestSnapshot/equip/etc
-	MinSyncInterval = 0.08, -- throttle push snapshot
-	MaxItemsInSnapshot = 9999, -- sécurité
+	RequestCooldown = 0.25, -- anti-spam for requests
+	MinSyncInterval = 0.08, -- throttle outgoing syncs
+	EnableSnapshotCoalescing = true, -- queue and merge sync requests during throttle
+	UseStandaloneRequestListener = false, -- requests are routed by RemoteHandler
+	SyncIncludeItemsOnRequest = false, -- keep request payloads lightweight by default
+	SyncIncludeItemsDefault = false, -- routine syncs include count/capacity only
+	SyncIncludeItemsByReason = {}, -- optional per-reason overrides
+	MaxItemsInSnapshot = 9999, -- safety cap when item list is included
 }
 
 return Config

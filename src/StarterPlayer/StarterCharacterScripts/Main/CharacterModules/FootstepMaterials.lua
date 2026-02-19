@@ -6,6 +6,8 @@ local player = Players.LocalPlayer
 local characterAddedConn: RBXScriptConnection? = nil
 local floorConn: RBXScriptConnection? = nil
 local speedConn: RBXScriptConnection? = nil
+local swingConn: RBXScriptConnection? = nil
+local attackingConn: RBXScriptConnection? = nil
 
 local function disconnect(conn: RBXScriptConnection?)
 	if conn then
@@ -44,6 +46,10 @@ local function initForCharacter(character: Model)
 	floorConn = nil
 	disconnect(speedConn)
 	speedConn = nil
+	disconnect(swingConn)
+	swingConn = nil
+	disconnect(attackingConn)
+	attackingConn = nil
 
 	local humanoid = character:WaitForChild("Humanoid")
 	local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
@@ -54,6 +60,20 @@ local function initForCharacter(character: Model)
 
 	local baseSpeed = 9
 
+	local function isM1Locked(): boolean
+		return character:GetAttribute("Swing") == true or character:GetAttribute("Attacking") == true
+	end
+
+	local function resolveVolume(baseVolume: number): number
+		if humanoid.WalkSpeed < 8 then
+			return 0
+		end
+		if isM1Locked() then
+			return 0
+		end
+		return baseVolume
+	end
+
 	local function updateForMaterial()
 		local floorMaterial = humanoid.FloorMaterial
 		local materialConfig = MaterialSounds[floorMaterial]
@@ -61,11 +81,11 @@ local function initForCharacter(character: Model)
 		baseSpeed = (floorMaterial == Enum.Material.Grass) and 16 or 9
 
 		if materialConfig then
-			footStepsSound.Volume = (humanoid.WalkSpeed < 8) and 0 or materialConfig.Volume
+			footStepsSound.Volume = resolveVolume(materialConfig.Volume)
 			footStepsSound.PlaybackSpeed = materialConfig.PlaybackSpeed * (humanoid.WalkSpeed / baseSpeed)
 			footStepsSound.SoundId = materialConfig.SoundId
 		else
-			footStepsSound.Volume = (humanoid.WalkSpeed < 8) and 0 or 10
+			footStepsSound.Volume = resolveVolume(10)
 			footStepsSound.SoundId = "rbxasset://sounds/action_footsteps_plastic.mp3"
 			footStepsSound.PlaybackSpeed = humanoid.WalkSpeed / baseSpeed
 		end
@@ -76,7 +96,7 @@ local function initForCharacter(character: Model)
 		local materialConfig = MaterialSounds[floorMaterial]
 
 		baseSpeed = (floorMaterial == Enum.Material.Grass) and 16 or 9
-		footStepsSound.Volume = (humanoid.WalkSpeed < 8) and 0 or (materialConfig and materialConfig.Volume or 10)
+		footStepsSound.Volume = resolveVolume(materialConfig and materialConfig.Volume or 10)
 
 		if materialConfig then
 			footStepsSound.PlaybackSpeed = materialConfig.PlaybackSpeed * (humanoid.WalkSpeed / baseSpeed)
@@ -88,11 +108,21 @@ local function initForCharacter(character: Model)
 	updateForMaterial()
 	floorConn = humanoid:GetPropertyChangedSignal("FloorMaterial"):Connect(updateForMaterial)
 	speedConn = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(updateForSpeed)
+	swingConn = character:GetAttributeChangedSignal("Swing"):Connect(updateForSpeed)
+	attackingConn = character:GetAttributeChangedSignal("Attacking"):Connect(updateForSpeed)
 end
 
 function FootstepMaterials.Init()
 	disconnect(characterAddedConn)
 	characterAddedConn = nil
+	disconnect(floorConn)
+	floorConn = nil
+	disconnect(speedConn)
+	speedConn = nil
+	disconnect(swingConn)
+	swingConn = nil
+	disconnect(attackingConn)
+	attackingConn = nil
 
 	local character = player.Character or player.CharacterAdded:Wait()
 	initForCharacter(character)

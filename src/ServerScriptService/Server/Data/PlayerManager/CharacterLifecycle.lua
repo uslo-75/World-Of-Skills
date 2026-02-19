@@ -232,8 +232,11 @@ function CharacterLifecycle.new(deps)
 		end
 
 		local hairId = (desc and desc.HairAccessory ~= "" and desc.HairAccessory) or "None"
-
-		DataManager.ChangeRace(player, "Varans", "Cat", true)
+		if typeof(charData.Civilizations) ~= "string" or charData.Civilizations == "" then
+			DataManager.SetRandomRace(player)
+		elseif charData.Civilizations == "Varans" and (typeof(charData.VaransPath) ~= "string" or charData.VaransPath == "") then
+			DataManager.ChangeRace(player, "Varans", nil, false)
+		end
 
 		if not charData.Hair then
 			charData.Hair = hairId
@@ -242,15 +245,24 @@ function CharacterLifecycle.new(deps)
 		if not charData.HairColor then
 			local variant = charData.RaceVariant
 			local assetsRoot = getCustomizationAssetRoot(charData)
-			local color3 = assetsRoot.Variant["Variant" .. variant].Color.Value
-			charData.HairColor = { r = color3.R, g = color3.G, b = color3.B }
+			local variantFolder = assetsRoot and assetsRoot:FindFirstChild("Variant")
+			local variantEntry = variantFolder and variantFolder:FindFirstChild("Variant" .. tostring(variant))
+			local colorValue = variantEntry and variantEntry:FindFirstChild("Color")
+			if colorValue and colorValue:IsA("Color3Value") then
+				local color3 = colorValue.Value
+				charData.HairColor = { r = color3.R, g = color3.G, b = color3.B }
+			end
 		end
 
-		if not charData.Shirt or charData.Shirt == "None" then
-			charData.Shirt = getCustomizationAssetRoot(charData).Shirt.Value
+		local customizationRoot = getCustomizationAssetRoot(charData)
+		local shirtValue = customizationRoot and customizationRoot:FindFirstChild("Shirt")
+		local pantValue = customizationRoot and customizationRoot:FindFirstChild("Pant")
+
+		if (not charData.Shirt or charData.Shirt == "None") and shirtValue and shirtValue:IsA("StringValue") then
+			charData.Shirt = shirtValue.Value
 		end
-		if not charData.Pant or charData.Pant == "None" then
-			charData.Pant = getCustomizationAssetRoot(charData).Pant.Value
+		if (not charData.Pant or charData.Pant == "None") and pantValue and pantValue:IsA("StringValue") then
+			charData.Pant = pantValue.Value
 		end
 
 		SessionUtils.setValue(player, "Civilizations", charData.Civilizations, "Instance")

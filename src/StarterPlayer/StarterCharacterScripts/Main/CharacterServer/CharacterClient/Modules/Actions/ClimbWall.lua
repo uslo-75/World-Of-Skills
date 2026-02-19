@@ -20,6 +20,14 @@ function ActionsClimbWall.Bind(module, context)
 	local wallRunConnManager = context.wallRunConnManager
 	local destroyAfter = context.destroyAfter
 
+	local function isDefenseActive(plr: Player, char: Model): boolean
+		if char:GetAttribute("isBlocking") == true or char:GetAttribute("Parrying") == true then
+			return true
+		end
+
+		return StateManager.GetState(plr, "isBlocking") == true or StateManager.GetState(plr, "Parrying") == true
+	end
+
 	local function stopClimbConn(plr: Player)
 		climbConnManager:Disconnect(plr)
 	end
@@ -93,6 +101,9 @@ function ActionsClimbWall.Bind(module, context)
 	function module.MovementClimb(plr: Player): boolean
 		local char = plr.Character
 		if not char then
+			return false
+		end
+		if isDefenseActive(plr, char) then
 			return false
 		end
 		if isGripBlocked(plr) then
@@ -335,6 +346,9 @@ function ActionsClimbWall.Bind(module, context)
 		if not char then
 			return false
 		end
+		if isDefenseActive(plr, char) then
+			return false
+		end
 		if isCarryOrGripBlocked(plr) then
 			return false
 		end
@@ -412,6 +426,9 @@ function ActionsClimbWall.Bind(module, context)
 	function module.WallRun(plr: Player, rayInput: RaycastResult, direction: number, wallRunParams: RaycastParams)
 		local char = plr.Character
 		if not char then
+			return
+		end
+		if isDefenseActive(plr, char) then
 			return
 		end
 		if isCarryOrGripBlocked(plr) then

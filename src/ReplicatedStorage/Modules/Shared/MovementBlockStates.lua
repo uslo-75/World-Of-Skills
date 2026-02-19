@@ -22,6 +22,8 @@ MovementBlockStates.BaseAnimator = {
 	StateKeys.Swinging,
 	StateKeys.UsingMove,
 	StateKeys.IsRagdoll,
+	StateKeys.Blocking,
+	StateKeys.Parrying,
 }
 
 MovementBlockStates.DirectionalWalk = {
@@ -38,6 +40,8 @@ MovementBlockStates.DirectionalWalk = {
 	StateKeys.Swinging,
 	StateKeys.UsingMove,
 	StateKeys.Downed,
+	StateKeys.Blocking,
+	StateKeys.Parrying,
 }
 
 return MovementBlockStates

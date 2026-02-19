@@ -1,28 +1,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local InstanceUtil = require(
+	ReplicatedStorage:WaitForChild("LocalHandler"):WaitForChild("libs"):WaitForChild("Common"):WaitForChild("InstanceUtil")
+)
 
 local module = {}
 local vfxFolder = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("vfx")
-
-local function destroyAfter(inst: Instance?, delaySeconds: number?)
-	if not inst then
-		return
-	end
-
-	local t = tonumber(delaySeconds) or 0
-	if t <= 0 then
-		if inst.Parent then
-			inst:Destroy()
-		end
-		return
-	end
-
-	task.delay(t, function()
-		if inst and inst.Parent then
-			inst:Destroy()
-		end
-	end)
-end
 
 local function createAttachmentIfNotExists(parent: BasePart, name: string, position: Vector3): Attachment
 	local attachment = parent:FindFirstChild(name)
@@ -65,7 +48,7 @@ module.TweenForward = function(params)
 		if not params.Destroy then
 			TweenService:Create(velocityTween, TweenInfo.new(params.duration), { Value = 0 }):Play()
 		end
-		destroyAfter(bv, params.duration)
+		InstanceUtil.DestroyAfter(bv, params.duration)
 	end
 
 	local renderConn: RBXScriptConnection? = nil
@@ -302,7 +285,7 @@ module.BodyColour = function(params)
 	local fadeTween = TweenService:Create(highlight, tweenInfo, { FillTransparency = 1, OutlineTransparency = 1 })
 	fadeTween:Play()
 
-	destroyAfter(highlight, data[1])
+	InstanceUtil.DestroyAfter(highlight, data[1])
 end
 
 module.FOV = function(params)
