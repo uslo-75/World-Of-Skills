@@ -361,12 +361,12 @@ function module.Execute(service, context)
 		hitTriggered = true
 		character:SetAttribute("Attacking", false)
 		service:PlayWeaponSound(character, equippedTool.Name, { "MeleHit", "AirSwing", "swing1" }, rootPart)
-		service:PushVelocity(
-			character,
-			-rootPart.CFrame.LookVector * recoilSpeed,
-			recoilDuration,
-			math.max(1200, recoilSpeed * 1500)
-		)
+		service:ApplyPush(character, {
+			direction = -rootPart.CFrame.LookVector,
+			speed = recoilSpeed,
+			duration = recoilDuration,
+			maxForce = math.max(1200, recoilSpeed * 1500),
+		})
 
 		service:SpawnHitbox({
 			player = player,

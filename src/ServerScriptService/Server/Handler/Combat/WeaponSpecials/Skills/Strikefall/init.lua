@@ -154,7 +154,12 @@ function module.Execute(service, context)
 	)
 
 	character:SetAttribute("UsingMove", true)
-	service:PushForward(character, openingForwardSpeed, openingForwardDuration)
+	service:ApplyPush(character, {
+		direction = "Forward",
+		planar = true,
+		speed = openingForwardSpeed,
+		duration = openingForwardDuration,
+	})
 
 	local trails = ActionUtil.CollectWeaponTrails(character, equippedTool)
 	ActionUtil.SetTrailsEnabled(trails, true)

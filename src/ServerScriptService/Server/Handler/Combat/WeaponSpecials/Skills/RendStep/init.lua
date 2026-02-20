@@ -386,12 +386,12 @@ function module.Execute(service, context)
 
 		local flatLook = Vector3.new(rootPart.CFrame.LookVector.X, 0, rootPart.CFrame.LookVector.Z)
 		if flatLook.Magnitude > 0 then
-			service:PushVelocity(
-				character,
-				flatLook.Unit * missDashSpeed,
-				missDashDuration,
-				math.max(1200, missDashSpeed * 1500)
-			)
+			service:ApplyPush(character, {
+				direction = flatLook,
+				speed = missDashSpeed,
+				duration = missDashDuration,
+				maxForce = math.max(1200, missDashSpeed * 1500),
+			})
 		end
 
 		local missAnimation = SkillAnimUtil.ResolveSkillAnimation(service, { "MeleStartUpMiss", "RendStepMiss" })

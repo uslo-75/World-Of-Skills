@@ -110,7 +110,12 @@ function module.Execute(service, context)
 			{ player }
 		)
 
-		service:PushForward(character, forwardSpeed, forwardDuration)
+		service:ApplyPush(character, {
+			direction = "Forward",
+			planar = true,
+			speed = forwardSpeed,
+			duration = forwardDuration,
+		})
 		service:PlayWeaponSound(character, equippedTool.Name, { "critical", "FlashStrike2" }, rootPart)
 		service:SpawnHitbox({
 			player = player,

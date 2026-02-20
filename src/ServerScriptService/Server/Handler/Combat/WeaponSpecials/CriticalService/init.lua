@@ -15,9 +15,6 @@ local m1ServiceRoot = combatRoot:WaitForChild("M1"):WaitForChild("M1Service")
 local M1Calc = require(m1ServiceRoot:WaitForChild("M1Calc"))
 local M1Anims = require(m1ServiceRoot:WaitForChild("M1Anims"))
 local M1Queries = require(m1ServiceRoot:WaitForChild("M1Queries"))
-local SkillAnimUtil = require(
-	combatRoot:WaitForChild("WeaponSpecials"):WaitForChild("Shared"):WaitForChild("SkillAnimUtil")
-)
 local CombatWeaponUtil = require(combatRoot:WaitForChild("Shared"):WaitForChild("CombatWeaponUtil"))
 local CombatNet = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Shared"):WaitForChild("CombatNet"))
 
@@ -40,9 +37,13 @@ end
 
 local CriticalConstants = require(resolveLocalModule("CriticalConstants"))
 local CriticalRequestValidator = require(resolveLocalModule("CriticalRequestValidator"))
+local CriticalActionRegistry = require(resolveLocalModule("CriticalActionRegistry"))
+local CriticalPrewarm = require(resolveLocalModule("CriticalPrewarm"))
+local CriticalMotion = require(resolveLocalModule("CriticalMotion"))
 
 local ATTR = CriticalConstants.Attributes
 local BLOCKED_SELF_ATTRS = CriticalConstants.BlockedSelfAttrs
+local ACTION_DEFS_LIST = CriticalActionRegistry.ActionDefsList
 
 local DEFAULT_SETTINGS = table.freeze({
 	MinUseIntervalFloor = 0.1,
@@ -58,98 +59,8 @@ local DEFAULT_SETTINGS = table.freeze({
 	DefaultWeaponFolder = "Default",
 })
 
-local ACTION_DEFS = table.freeze({
-	Critical = table.freeze({
-		name = "Critical",
-		cooldownAttr = ATTR.Cooldown,
-		cooldownTimeAttr = ATTR.CooldownTime,
-	}),
-	Aerial = table.freeze({
-		name = "Aerial",
-		cooldownAttr = "AerialCooldown",
-		cooldownTimeAttr = "AerialCooldownTime",
-	}),
-	Running = table.freeze({
-		name = "Running",
-		cooldownAttr = "RunningCooldown",
-		cooldownTimeAttr = "RunningCooldownTime",
-	}),
-	Strikefall = table.freeze({
-		name = "Strikefall",
-		cooldownAttr = "StrikefallCooldown",
-		cooldownTimeAttr = "StrikefallCooldownTime",
-	}),
-	RendStep = table.freeze({
-		name = "RendStep",
-		cooldownAttr = "RendStepCooldown",
-		cooldownTimeAttr = "RendStepCooldownTime",
-	}),
-	AnchoringStrike = table.freeze({
-		name = "AnchoringStrike",
-		cooldownAttr = "AnchoringStrikeCooldown",
-		cooldownTimeAttr = "AnchoringStrikeCooldownTime",
-	}),
-})
-
-local ACTION_ALIAS_BY_KEY = table.freeze({
-	critical = "Critical",
-	aerial = "Aerial",
-	running = "Running",
-	strikefall = "Strikefall",
-	rendstep = "RendStep",
-	anchoringstrike = "AnchoringStrike",
-})
-
-local SKILL_KEY_BY_CODE = table.freeze({
-	Z = "Z",
-	z = "Z",
-	X = "X",
-	x = "X",
-	C = "C",
-	c = "C",
-	V = "V",
-	v = "V",
-})
-
-local SKILL_PREWARM_ANIMATION_CANDIDATES = table.freeze({
-	Strikefall = table.freeze({
-		"MeleCharge",
-		"Strikefall",
-		"MeleHit",
-		"StrikefallCombo",
-	}),
-	RendStep = table.freeze({
-		"MeleStartUp",
-		"RendStep",
-		"MeleStartUpMiss",
-		"RendStepMiss",
-		"MeleStartUpHit",
-		"RendStepHit",
-	}),
-	AnchoringStrike = table.freeze({
-		"AnchoringStrike",
-	}),
-})
-
 local CriticalService = {}
 CriticalService.__index = CriticalService
-
-local function cleanupInstance(inst: Instance?)
-	if inst and inst.Parent then
-		inst:Destroy()
-	end
-end
-
-local function addAnimationUnique(target: { Animation }, seen: { [Animation]: boolean }, animation: Animation?)
-	if not animation then
-		return
-	end
-	if seen[animation] then
-		return
-	end
-	seen[animation] = true
-	table.insert(target, animation)
-end
 
 local function mergeSettings(customSettings: { [string]: any }?): { [string]: any }
 	local merged = {}
@@ -164,20 +75,6 @@ local function mergeSettings(customSettings: { [string]: any }?): { [string]: an
 	end
 
 	return merged
-end
-
-local function normalizeActionName(raw: any): string
-	if typeof(raw) ~= "string" then
-		return "Critical"
-	end
-
-	local key = string.lower(raw):gsub("[%s_%-%./]", "")
-	local canonical = ACTION_ALIAS_BY_KEY[key]
-	if canonical then
-		return canonical
-	end
-
-	return "Critical"
 end
 
 function CriticalService.new(deps)
@@ -218,8 +115,7 @@ function CriticalService:_resolveCombatHandler()
 end
 
 function CriticalService:_resolveActionDef(actionName: any)
-	local normalized = normalizeActionName(actionName)
-	return ACTION_DEFS[normalized], normalized
+	return CriticalActionRegistry.ResolveActionDef(actionName)
 end
 
 function CriticalService:_getWeaponStats(toolName: string): { [string]: any }
@@ -238,11 +134,7 @@ function CriticalService:_getWeaponStats(toolName: string): { [string]: any }
 end
 
 function CriticalService:_normalizeSkillKey(raw: any): string?
-	if typeof(raw) ~= "string" then
-		return nil
-	end
-
-	return SKILL_KEY_BY_CODE[raw]
+	return CriticalActionRegistry.NormalizeSkillKey(raw)
 end
 
 function CriticalService:_resolveSkillNameFromPayload(weaponStats: { [string]: any }, payload: any): (string?, string?)
@@ -273,7 +165,7 @@ function CriticalService:_resolveSkillNameFromPayload(weaponStats: { [string]: a
 		return nil, "SkillNotConfigured"
 	end
 
-	local normalizedSkillName = normalizeActionName(trimmed)
+	local normalizedSkillName = CriticalActionRegistry.NormalizeActionName(trimmed)
 	if normalizedSkillName == "Critical" and string.lower(trimmed) ~= "critical" then
 		return nil, "SkillNotSupported"
 	end
@@ -326,77 +218,11 @@ function CriticalService:_releaseAttack(player: Player, character: Model, token:
 end
 
 function CriticalService:_stopForwardVelocity(character: Model)
-	local state = self._forwardVelocityByCharacter[character]
-	if not state then
-		return
-	end
-
-	cleanupInstance(state.velocity)
-	cleanupInstance(state.attachment)
-	self._forwardVelocityByCharacter[character] = nil
+	CriticalMotion.StopForwardVelocity(self._forwardVelocityByCharacter, character)
 end
 
-function CriticalService:PushForward(character: Model, speed: number, duration: number)
-	if speed <= 0 then
-		return
-	end
-	if duration <= 0 then
-		return
-	end
-	if not character or not character.Parent then
-		return
-	end
-
-	local rootPart = character:FindFirstChild("HumanoidRootPart")
-	if not rootPart or not rootPart:IsA("BasePart") then
-		return
-	end
-
-	local flatDirection = Vector3.new(rootPart.CFrame.LookVector.X, 0, rootPart.CFrame.LookVector.Z)
-	if flatDirection.Magnitude <= 0 then
-		return
-	end
-
-	self:PushVelocity(character, flatDirection.Unit * speed, duration, math.max(1200, speed * 1500))
-end
-
-function CriticalService:PushVelocity(character: Model, worldVelocity: Vector3, duration: number, maxForce: number?)
-	self:_stopForwardVelocity(character)
-	if duration <= 0 then
-		return
-	end
-	if not character or not character.Parent then
-		return
-	end
-
-	local rootPart = character:FindFirstChild("HumanoidRootPart")
-	if not rootPart or not rootPart:IsA("BasePart") then
-		return
-	end
-
-	local attachment = Instance.new("Attachment")
-	attachment.Name = "__CriticalForwardAttachment"
-	attachment.Parent = rootPart
-
-	local velocity = Instance.new("LinearVelocity")
-	velocity.Name = "__CriticalForwardVelocity"
-	velocity.Attachment0 = attachment
-	velocity.RelativeTo = Enum.ActuatorRelativeTo.World
-	velocity.MaxForce = math.max(1200, M1Calc.ToNumber(maxForce, worldVelocity.Magnitude * 1500))
-	velocity.VectorVelocity = worldVelocity
-	velocity.Parent = rootPart
-
-	self._forwardVelocityByCharacter[character] = {
-		attachment = attachment,
-		velocity = velocity,
-	}
-
-	task.delay(duration, function()
-		local latest = self._forwardVelocityByCharacter[character]
-		if latest and latest.velocity == velocity then
-			self:_stopForwardVelocity(character)
-		end
-	end)
+function CriticalService:ApplyPush(character: Model, config: { [string]: any }?)
+	CriticalMotion.ApplyPush(self._forwardVelocityByCharacter, character, config, M1Calc)
 end
 
 function CriticalService:_isRestoreBlocked(character: Model): boolean
@@ -523,7 +349,7 @@ function CriticalService:ResolveActionAnimation(
 	actionName: any,
 	comboForFallback: number?
 ): Animation?
-	local normalizedActionName = normalizeActionName(actionName)
+	local normalizedActionName = CriticalActionRegistry.NormalizeActionName(actionName)
 	local animation = M1Anims.ResolveWeaponAttackAnimation(self.AssetsRoot, toolName, normalizedActionName)
 	if animation then
 		return animation
@@ -792,56 +618,18 @@ function CriticalService:_prewarmActionHandlers(character: Model, equippedTool: 
 		return
 	end
 
-	for _, actionDef in pairs(ACTION_DEFS) do
+	for _, actionDef in ipairs(ACTION_DEFS_LIST) do
 		self:_resolveActionHandler(character, equippedTool, actionDef.name)
 	end
 
-	self:_prewarmActionAnimations(character, equippedTool)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health > 0 then
+		local animations = CriticalPrewarm.CollectAnimations(self, character, equippedTool, ACTION_DEFS_LIST)
+		CriticalPrewarm.PrewarmTracks(self.AnimUtil, humanoid, animations, "__CriticalPrewarm")
+	end
 
 	for _, toolName in ipairs(toolNames) do
 		cacheByToolName[toolName] = true
-	end
-end
-
-function CriticalService:_collectPrewarmAnimations(character: Model, equippedTool: Tool): { Animation }
-	local animations = {}
-	local seen: { [Animation]: boolean } = {}
-	local comboForFallback = 4
-
-	for _, actionDef in pairs(ACTION_DEFS) do
-		local animation = self:ResolveActionAnimation(character, equippedTool.Name, actionDef.name, comboForFallback)
-		addAnimationUnique(animations, seen, animation)
-	end
-
-	for _, candidates in pairs(SKILL_PREWARM_ANIMATION_CANDIDATES) do
-		for _, candidate in ipairs(candidates) do
-			addAnimationUnique(animations, seen, SkillAnimUtil.ResolveSkillAnimation(self, { candidate }))
-		end
-	end
-
-	return animations
-end
-
-function CriticalService:_prewarmActionAnimations(character: Model, equippedTool: Tool)
-	if not self.AnimUtil or typeof(self.AnimUtil.LoadTrack) ~= "function" then
-		return
-	end
-
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.Health <= 0 then
-		return
-	end
-
-	for _, animation in ipairs(self:_collectPrewarmAnimations(character, equippedTool)) do
-		local ok, track = pcall(self.AnimUtil.LoadTrack, humanoid, animation, "__CriticalPrewarm")
-		if ok and track then
-			pcall(function()
-				track:Stop(0)
-			end)
-			pcall(function()
-				track:Destroy()
-			end)
-		end
 	end
 end
 
@@ -974,7 +762,7 @@ function CriticalService:_initCharacter(player: Player, character: Model)
 	self._activeAttackToken[player] = nil
 	self._cooldownToken[player] = nil
 	self:_stopForwardVelocity(character)
-	for _, actionDef in pairs(ACTION_DEFS) do
+	for _, actionDef in ipairs(ACTION_DEFS_LIST) do
 		character:SetAttribute(actionDef.cooldownAttr, nil)
 		character:SetAttribute(actionDef.cooldownTimeAttr, nil)
 	end
@@ -990,7 +778,7 @@ function CriticalService:_cleanupPlayer(player: Player)
 	local character = player.Character
 	if character and character.Parent then
 		self:_stopForwardVelocity(character)
-		for _, actionDef in pairs(ACTION_DEFS) do
+		for _, actionDef in ipairs(ACTION_DEFS_LIST) do
 			character:SetAttribute(actionDef.cooldownAttr, nil)
 			character:SetAttribute(actionDef.cooldownTimeAttr, nil)
 		end

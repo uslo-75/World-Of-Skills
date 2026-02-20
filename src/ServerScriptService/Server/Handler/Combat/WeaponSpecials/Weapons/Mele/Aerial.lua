@@ -68,12 +68,20 @@ function module.Execute(service, context)
 
 	local function applyLiftImpulse()
 		local velocity = rootPart.CFrame.LookVector * liftForwardSpeed + Vector3.new(0, liftUpSpeed, 0)
-		service:PushVelocity(character, velocity, liftDuration, liftMaxForce)
+		service:ApplyPush(character, {
+			velocity = velocity,
+			duration = liftDuration,
+			maxForce = liftMaxForce,
+		})
 	end
 
 	local function applyDownImpulse()
 		local velocity = rootPart.CFrame.LookVector * downForwardSpeed + Vector3.new(0, downVerticalSpeed, 0)
-		service:PushVelocity(character, velocity, downDuration, downMaxForce)
+		service:ApplyPush(character, {
+			velocity = velocity,
+			duration = downDuration,
+			maxForce = downMaxForce,
+		})
 	end
 
 	applyLiftImpulse()

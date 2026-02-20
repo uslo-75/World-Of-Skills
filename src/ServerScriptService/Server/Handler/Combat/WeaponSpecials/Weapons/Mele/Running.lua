@@ -60,7 +60,12 @@ function module.Execute(service, context)
 			return
 		end
 
-		service:PushVelocity(character, flatDirection.Unit * windUpSpeed, windUpDuration, windUpMaxForce)
+		service:ApplyPush(character, {
+			direction = flatDirection,
+			speed = windUpSpeed,
+			duration = windUpDuration,
+			maxForce = windUpMaxForce,
+		})
 	end
 
 	local attackAnimation = service:ResolveActionAnimation(character, equippedTool.Name, actionName, comboForReaction)
