@@ -15,6 +15,9 @@ local m1ServiceRoot = combatRoot:WaitForChild("M1"):WaitForChild("M1Service")
 local M1Calc = require(m1ServiceRoot:WaitForChild("M1Calc"))
 local M1Anims = require(m1ServiceRoot:WaitForChild("M1Anims"))
 local M1Queries = require(m1ServiceRoot:WaitForChild("M1Queries"))
+local SkillAnimUtil = require(
+	combatRoot:WaitForChild("WeaponSpecials"):WaitForChild("Shared"):WaitForChild("SkillAnimUtil")
+)
 local CombatWeaponUtil = require(combatRoot:WaitForChild("Shared"):WaitForChild("CombatWeaponUtil"))
 local CombatNet = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Shared"):WaitForChild("CombatNet"))
 
@@ -108,6 +111,26 @@ local SKILL_KEY_BY_CODE = table.freeze({
 	v = "V",
 })
 
+local SKILL_PREWARM_ANIMATION_CANDIDATES = table.freeze({
+	Strikefall = table.freeze({
+		"MeleCharge",
+		"Strikefall",
+		"MeleHit",
+		"StrikefallCombo",
+	}),
+	RendStep = table.freeze({
+		"MeleStartUp",
+		"RendStep",
+		"MeleStartUpMiss",
+		"RendStepMiss",
+		"MeleStartUpHit",
+		"RendStepHit",
+	}),
+	AnchoringStrike = table.freeze({
+		"AnchoringStrike",
+	}),
+})
+
 local CriticalService = {}
 CriticalService.__index = CriticalService
 
@@ -115,6 +138,17 @@ local function cleanupInstance(inst: Instance?)
 	if inst and inst.Parent then
 		inst:Destroy()
 	end
+end
+
+local function addAnimationUnique(target: { Animation }, seen: { [Animation]: boolean }, animation: Animation?)
+	if not animation then
+		return
+	end
+	if seen[animation] then
+		return
+	end
+	seen[animation] = true
+	table.insert(target, animation)
 end
 
 local function mergeSettings(customSettings: { [string]: any }?): { [string]: any }
@@ -762,8 +796,52 @@ function CriticalService:_prewarmActionHandlers(character: Model, equippedTool: 
 		self:_resolveActionHandler(character, equippedTool, actionDef.name)
 	end
 
+	self:_prewarmActionAnimations(character, equippedTool)
+
 	for _, toolName in ipairs(toolNames) do
 		cacheByToolName[toolName] = true
+	end
+end
+
+function CriticalService:_collectPrewarmAnimations(character: Model, equippedTool: Tool): { Animation }
+	local animations = {}
+	local seen: { [Animation]: boolean } = {}
+	local comboForFallback = 4
+
+	for _, actionDef in pairs(ACTION_DEFS) do
+		local animation = self:ResolveActionAnimation(character, equippedTool.Name, actionDef.name, comboForFallback)
+		addAnimationUnique(animations, seen, animation)
+	end
+
+	for _, candidates in pairs(SKILL_PREWARM_ANIMATION_CANDIDATES) do
+		for _, candidate in ipairs(candidates) do
+			addAnimationUnique(animations, seen, SkillAnimUtil.ResolveSkillAnimation(self, { candidate }))
+		end
+	end
+
+	return animations
+end
+
+function CriticalService:_prewarmActionAnimations(character: Model, equippedTool: Tool)
+	if not self.AnimUtil or typeof(self.AnimUtil.LoadTrack) ~= "function" then
+		return
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then
+		return
+	end
+
+	for _, animation in ipairs(self:_collectPrewarmAnimations(character, equippedTool)) do
+		local ok, track = pcall(self.AnimUtil.LoadTrack, humanoid, animation, "__CriticalPrewarm")
+		if ok and track then
+			pcall(function()
+				track:Stop(0)
+			end)
+			pcall(function()
+				track:Destroy()
+			end)
+		end
 	end
 end
 
@@ -983,6 +1061,7 @@ function CriticalService:HandleActionRequest(player: Player, payload: any, force
 		return false, "Cooldown"
 	end
 	self._lastUseAt[player] = now
+	self:_prewarmActionHandlers(character, equippedTool)
 
 	local context = {
 		player = player,

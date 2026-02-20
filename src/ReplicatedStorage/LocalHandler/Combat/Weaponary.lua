@@ -37,6 +37,25 @@ do
 	end
 end
 
+local abilitiesPrewarmed = false
+
+local function prewarmAbilityModules()
+	if abilitiesPrewarmed then
+		return
+	end
+	if not abilitiesRoot then
+		return
+	end
+
+	abilitiesPrewarmed = true
+
+	for _, child in ipairs(abilitiesRoot:GetChildren()) do
+		if child:IsA("ModuleScript") then
+			ModuleRunner.Require(child, "Weaponary")
+		end
+	end
+end
+
 local function resolveWeaponActionModule(character: Model, actionName: string): ModuleScript?
 	if not weaponsRoot then
 		return nil
@@ -80,6 +99,8 @@ local function playWeaponAction(actionName: string, params: any)
 end
 
 local function playAbilityAction(abilityName: string, params: any)
+	prewarmAbilityModules()
+
 	if not abilitiesRoot then
 		return
 	end
@@ -317,5 +338,7 @@ end
 module.AnchoringStrike = function(params: any)
 	playAbilityAction("AnchoringStrike", params)
 end
+
+prewarmAbilityModules()
 
 return module
